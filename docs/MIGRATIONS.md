@@ -1,0 +1,5 @@
+# v1 to v2 migration
+
+The v2 migration runs inside the existing named SQLite Durable Object. It is additive and idempotent: it retains v1 `days`, `sent`, and `config`, creates schema/settings/medication/history/dose/audit/reminder/snooze/idempotency tables, inserts default v1-equivalent settings (22:00–04:00, 30 minutes, America/Los_Angeles, group mode), maps legacy day status into v2 day records, maps legacy sent slots into delivered reminder slots, and leaves the push subscription in `config` unchanged.
+
+Before deployment, save an authenticated status snapshot and confirm the subscription is active. After deployment, immediately export JSON and verify schema version 2, the current taken state, historical rows, default settings, and active subscription. Do not delete old tables. Worker rollback restores code but not SQLite state; v2 therefore keeps old data and schema compatible. Use Cloudflare's documented point-in-time recovery only after confirming its current availability and retention for the account.

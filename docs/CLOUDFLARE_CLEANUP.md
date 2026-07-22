@@ -1,0 +1,3 @@
+# Cloudflare cleanup checklist
+
+Cleanup is destructive. Export anything required, verify the active account and Worker name, and remove the device subscription if possible. Run `pnpm wrangler deploy -c wrangler.cleanup.jsonc`; the declarative tombstone permanently deletes the SQLite Durable Object namespace and all medication data. Then run `pnpm wrangler delete pourmed` to delete the cleanup Worker and its Cron/secrets. Confirm the Worker, static deployment, Cron Trigger, secrets, and namespace are gone in the dashboard. No domain or paid add-on should exist. Local secret files can then be moved to Trash; Git-tracked source remains.

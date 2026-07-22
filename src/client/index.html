@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#173b36" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" href="/icons/icon.svg" />
+    <link rel="stylesheet" href="/style.css" />
+    <title>PourMed</title>
+  </head>
+  <body>
+    <header class="app-header">
+      <img src="/icons/icon.svg" alt="" width="48" height="48" />
+      <div>
+        <h1>PourMed</h1>
+        <p id="day">Medication day</p>
+      </div>
+      <span id="connection" class="pill">Online</span>
+    </header>
+    <main>
+      <section
+        id="today-view"
+        class="view active"
+        aria-labelledby="today-title"
+      >
+        <h2 id="today-title" class="sr-only">Today</h2>
+        <article class="hero card">
+          <p id="status-icon" class="status-icon" aria-hidden="true">○</p>
+          <h2 id="status">Status unavailable</h2>
+          <p id="detail">Connect to load today’s medications.</p>
+          <p id="schedule-summary" class="muted"></p>
+          <p id="next-reminder" class="muted"></p>
+          <dl id="today-summary" class="today-summary">
+            <dt>Medication day</dt>
+            <dd id="today-summary-day">—</dd>
+            <dt>Current status</dt>
+            <dd id="today-summary-status">Unavailable</dd>
+            <dt>Next reminder</dt>
+            <dd id="today-summary-next">Unavailable</dd>
+            <dt>Reminder interval</dt>
+            <dd id="today-summary-interval">—</dd>
+            <dt>Reminder end</dt>
+            <dd id="today-summary-end">—</dd>
+          </dl>
+          <ul id="today-medications" class="med-list"></ul>
+          <button id="taken" class="primary" disabled>
+            I Took My Medication</button
+          ><button id="mark-all" class="secondary" hidden>Mark All Taken</button
+          ><button id="undo" class="secondary" hidden>
+            Undo — Mark as Not Taken
+          </button>
+          <div id="snooze-controls" class="compact-actions">
+            <button data-snooze="10">Snooze 10m</button
+            ><button data-snooze="20">20m</button
+            ><button data-snooze="30">30m</button
+            ><button data-snooze="60">60m</button>
+          </div>
+          <p id="snooze-state" class="muted"></p>
+          <button id="cancel-snooze" class="text-button" hidden>
+            Cancel snooze
+          </button>
+        </article>
+        <p id="message" role="status" aria-live="polite"></p>
+      </section>
+      <section id="history-view" class="view" aria-labelledby="history-title">
+        <h2 id="history-title">History</h2>
+        <div class="filters">
+          <label
+            >Completion<select id="history-filter">
+              <option value="all">All</option>
+              <option value="taken">Taken</option>
+              <option value="partial">Partial</option>
+              <option value="missed">Missed</option>
+              <option value="none">No schedule</option>
+            </select></label
+          ><label
+            >Medication<select id="medication-filter">
+              <option value="all">All medications</option>
+            </select></label
+          >
+        </div>
+        <div
+          id="calendar"
+          class="calendar"
+          aria-label="Monthly medication history"
+        ></div>
+        <article id="selected-day" class="card" aria-live="polite">
+          <h3 id="selected-day-title">Select a medication day</h3>
+          <div id="selected-day-content"></div>
+          <label
+            >Day note<textarea id="day-note" maxlength="1000"></textarea></label
+          ><button id="save-day-note" type="button">Save Note</button>
+        </article>
+      </section>
+      <section id="stats-view" class="view" aria-labelledby="stats-title">
+        <h2 id="stats-title">Statistics</h2>
+        <label class="stats-period"
+          >Period<select id="stats-period">
+            <option value="current-month">Current month</option>
+            <option value="previous-30">Previous 30 medication days</option>
+            <option value="previous-90">Previous 90 medication days</option>
+            <option value="this-year">This year</option>
+            <option value="all-time">All time</option>
+          </select></label
+        >
+        <section id="stats-empty" class="card" hidden>
+          <h3 id="stats-empty-title">No medication history yet.</h3>
+          <p id="stats-empty-detail" class="muted">
+            Complete your first medication day to start tracking adherence and
+            streaks.
+          </p>
+        </section>
+        <div id="stats-content" hidden>
+          <div id="stats-grid" class="stats-grid"></div>
+          <section class="card" aria-labelledby="consistency-title">
+            <h3 id="consistency-title">Consistency</h3>
+            <div id="consistency-summary" class="consistency-summary"></div>
+          </section>
+          <section class="card" aria-labelledby="timeline-title">
+            <h3 id="timeline-title">Completion timeline</h3>
+            <div id="stats-timeline" class="stats-timeline"></div>
+            <p id="timeline-description" class="muted"></p>
+          </section>
+          <p id="stats-definition" class="card muted"></p>
+        </div>
+      </section>
+      <section id="settings-view" class="view" aria-labelledby="settings-title">
+        <h2 id="settings-title">Settings</h2>
+        <form id="schedule-form" class="settings-groups">
+          <section class="card form-grid" aria-labelledby="schedule-heading">
+            <h3 id="schedule-heading">Reminder schedule</h3>
+            <label
+              >Start time<input id="start-time" type="time" required /></label
+            ><label>End time<input id="end-time" type="time" required /></label
+            ><label
+              >Interval<select id="interval">
+                <option>10</option>
+                <option>15</option>
+                <option>20</option>
+                <option selected>30</option>
+                <option>45</option>
+                <option>60</option>
+              </select></label
+            ><label class="check"
+              ><input id="reminders-enabled" type="checkbox" checked />
+              Reminders enabled</label
+            ><label
+              >Tracking mode<select id="completion-mode">
+                <option value="group">Take all together</option>
+                <option value="individual">Track individually</option>
+              </select></label
+            >
+          </section>
+          <section
+            class="card form-grid"
+            aria-labelledby="notifications-heading"
+          >
+            <h3 id="notifications-heading">Notifications</h3>
+            <label class="check"
+              ><input id="quiet-preference" type="checkbox" /> Prefer quiet
+              notification presentation</label
+            ><label class="check"
+              ><input id="badge-preference" type="checkbox" checked /> Show
+              notification badge where supported</label
+            ><label
+              >Optional notification preview<input
+                id="preview-text"
+                maxlength="120"
+            /></label>
+            <p class="muted">
+              Sound, Lock Screen, banners, Focus, and notification summaries are
+              controlled in iPhone Settings → Notifications → PourMed.
+            </p>
+            <div class="stack">
+              <button type="button" id="enable">Enable Notifications</button
+              ><button type="button" id="refresh">Refresh Subscription</button
+              ><button type="button" id="test">Send Test Notification</button
+              ><button type="button" id="test-delayed">
+                Delayed Test Notification (10 seconds)</button
+              ><button type="button" id="remove-device">
+                Remove This Device
+              </button>
+            </div>
+            <p class="muted">
+              Technical notification status is available in Advanced below.
+            </p>
+          </section>
+          <section class="card form-grid" aria-labelledby="appearance-heading">
+            <h3 id="appearance-heading">Appearance</h3>
+            <label
+              >Appearance<select id="theme">
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select></label
+            >
+          </section>
+          <button class="primary" type="submit">Save Settings</button>
+          <details class="card" id="advanced-settings">
+            <summary>Advanced</summary>
+            <label
+              >Timezone<input
+                id="timezone"
+                value="America/Los_Angeles"
+                maxlength="100"
+                required
+            /></label>
+            <h3>Technical diagnostics</h3>
+            <dl class="diagnostics">
+              <dt>Server authentication</dt>
+              <dd id="auth-state">Not checked</dd>
+              <dt>Local token length</dt>
+              <dd id="local-token-length">0</dd>
+              <dt>Server expected token length</dt>
+              <dd id="server-token-length">Unknown</dd>
+              <dt>Trimming changed input</dt>
+              <dd id="token-trimmed">No</dd>
+              <dt>Home Screen PWA</dt>
+              <dd id="pwa-state">Checking…</dd>
+              <dt>Notification permission</dt>
+              <dd id="permission-state">Checking…</dd>
+              <dt>Push subscription</dt>
+              <dd id="subscription-state">Checking…</dd>
+              <dt>Service worker</dt>
+              <dd id="sw-version">Checking…</dd>
+              <dt>Last successful push</dt>
+              <dd id="last-push">None recorded</dd>
+              <dt>Last push error</dt>
+              <dd id="last-push-error">None recorded</dd>
+            </dl>
+            <h3>Advanced access</h3>
+            <label for="token">Private access token</label
+            ><input
+              id="token"
+              type="password"
+              autocomplete="off"
+              autocapitalize="none"
+              autocorrect="off"
+              spellcheck="false"
+            /><button type="button" id="save-token">Save on This Device</button
+            ><button type="button" id="forget-token">Remove Access</button>
+          </details>
+        </form>
+        <section class="card">
+          <h3>Medications</h3>
+          <div id="medication-list"></div>
+          <button id="add-medication">Add Medication</button>
+        </section>
+        <dialog id="med-dialog">
+          <form id="med-form">
+            <button
+              type="button"
+              class="dialog-close"
+              id="close-med"
+              aria-label="Close medication editor"
+            >
+              ×
+            </button>
+            <h2 id="med-title">Add medication</h2>
+            <input id="med-id" type="hidden" /><label
+              >Name<input id="med-name" maxlength="100" required /></label
+            ><label>Dosage<input id="med-dosage" maxlength="100" /></label
+            ><label
+              >Instructions<textarea
+                id="med-instructions"
+                maxlength="500"
+              ></textarea></label
+            ><label
+              >Notes<textarea id="med-notes" maxlength="1000"></textarea></label
+            ><label class="check"
+              ><input id="med-enabled" type="checkbox" checked /> Enabled</label
+            ><label class="check"
+              ><input id="med-required" type="checkbox" checked /> Required for
+              completion</label
+            ><button class="primary" type="submit">Save Medication</button>
+          </form>
+        </dialog>
+        <section class="card">
+          <h3>Data export</h3>
+          <p class="muted">
+            Exports include settings, medications, and history. Credentials and
+            push subscription details are excluded.
+          </p>
+          <button data-export="json">Download JSON</button
+          ><button data-export="csv">Download History CSV</button>
+        </section>
+        <details class="card">
+          <summary>Safety & privacy</summary>
+          <p>
+            PourMed is a personal reminder tool and does not provide medical
+            advice. Do not take an extra dose solely because the app shows an
+            uncertain status.
+          </p>
+          <p>
+            Delivery may be delayed by network loss, Focus modes, notification
+            settings, subscription expiry, or platform changes. Do not use
+            PourMed as the only safeguard for medically critical medication.
+            Confirm uncertain dosing with a clinician or pharmacist.
+          </p>
+        </details>
+      </section>
+    </main>
+    <nav class="bottom-nav" aria-label="Primary">
+      <button data-view="today" aria-current="page">Today</button
+      ><button data-view="history">History</button
+      ><button data-view="stats">Statistics</button
+      ><button data-view="settings">Settings</button>
+    </nav>
+    <aside id="update-banner" hidden>
+      <span id="update-status">An update is available.</span
+      ><button id="update-now">Update Now</button>
+    </aside>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,5 @@
+ACCESS_TOKEN_HASH=base64url-sha256-of-access-token
+ACCESS_TOKEN_LENGTH=expected-access-token-character-count
+VAPID_PUBLIC_KEY=base64url-p256-public-key
+VAPID_PRIVATE_KEY=base64url-p256-private-key
+VAPID_SUBJECT=mailto:you@example.com

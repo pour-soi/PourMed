@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pourmed",
+  "main": "scripts/cleanup-worker.ts",
+  "compatibility_date": "2026-07-21",
+  "exports": {
+    "MedicationState": { "type": "durable-object", "state": "deleted" },
+  },
+}
