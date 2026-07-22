@@ -4,6 +4,7 @@ import {
   automaticTimeZoneUpdate,
   classifyDay,
   completion,
+  completionTimestamp,
   medicationDay,
   getMedicationDayKey,
   isValidTimeZone,
@@ -146,6 +147,31 @@ describe("time zones", () => {
   });
 });
 describe("completion and statistics", () => {
+  it("uses the latest state-change time for an existing group completion", () => {
+    expect(
+      completionTimestamp(
+        true,
+        "2026-07-21T22:09:00.611Z",
+        "2026-07-22T06:09:00.611Z",
+        [],
+      ),
+    ).toBe("2026-07-22T06:09:00.611Z");
+  });
+  it("keeps the stored completion time for legacy records without change metadata", () => {
+    expect(
+      completionTimestamp(true, "2026-07-21T22:09:00.611Z", null, []),
+    ).toBe("2026-07-21T22:09:00.611Z");
+  });
+  it("ignores stale legacy times when only individual doses are taken", () => {
+    expect(
+      completionTimestamp(
+        false,
+        "2026-07-21T22:09:00.611Z",
+        "2026-07-22T06:09:00.611Z",
+        ["2026-07-22T05:30:00.000Z", "2026-07-22T06:10:00.000Z"],
+      ),
+    ).toBe("2026-07-22T06:10:00.000Z");
+  });
   it("handles group, individual and optional doses", () => {
     const doses = [
       { required: true, taken: true },

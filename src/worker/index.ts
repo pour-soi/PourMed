@@ -5,6 +5,7 @@ import {
 } from "@block65/webcrypto-web-push";
 import {
   classifyDay,
+  completionTimestamp,
   formatMinute,
   getMedicationDayKey,
   isValidTimeZone,
@@ -249,11 +250,12 @@ export class MedicationState extends DurableObject<Env> {
       ...this.ctx.storage.sql.exec<{
         legacy_taken: number;
         legacy_taken_at: string | null;
+        legacy_last_changed_at: string | null;
         note: string | null;
         corrected: number;
         corrected_at: string | null;
       }>(
-        "SELECT legacy_taken,legacy_taken_at,note,corrected,corrected_at FROM day_records WHERE day=?",
+        "SELECT day_records.legacy_taken,day_records.legacy_taken_at,days.last_changed_at legacy_last_changed_at,day_records.note,day_records.corrected,day_records.corrected_at FROM day_records LEFT JOIN days USING(day) WHERE day_records.day=?",
         day,
       ),
     ][0];
@@ -275,14 +277,12 @@ export class MedicationState extends DurableObject<Env> {
       this.settings().completionMode,
       !!r?.legacy_taken,
     );
-    const takenAt =
-      r?.legacy_taken_at ??
-      doses
-        .filter((d) => d.taken_at)
-        .map((d) => d.taken_at!)
-        .sort()
-        .at(-1) ??
-      null;
+    const takenAt = completionTimestamp(
+      !!r?.legacy_taken,
+      r?.legacy_taken_at ?? null,
+      r?.legacy_last_changed_at ?? null,
+      doses.map((d) => d.taken_at),
+    );
     return {
       day,
       status,
@@ -812,24 +812,27 @@ export class MedicationState extends DurableObject<Env> {
           );
         else {
           this.ctx.storage.sql.exec(
-            "UPDATE day_doses SET taken=?,taken_at=?,corrected_at=? WHERE day=?",
+            "UPDATE day_doses SET taken=?,taken_at=CASE WHEN ?=1 AND taken=0 THEN ? WHEN ?=0 THEN NULL ELSE taken_at END,corrected_at=? WHERE day=?",
+            take ? 1 : 0,
             take ? 1 : 0,
             take ? now.toISOString() : null,
+            take ? 1 : 0,
             day !== a.day ? now.toISOString() : null,
             day,
           );
           this.ctx.storage.sql.exec(
-            "INSERT INTO days(day,taken,taken_at,last_changed_at) VALUES(?,?,?,?) ON CONFLICT(day) DO UPDATE SET taken=excluded.taken,taken_at=CASE WHEN excluded.taken=1 THEN COALESCE(days.taken_at,excluded.taken_at) ELSE days.taken_at END,last_changed_at=excluded.last_changed_at",
+            "INSERT INTO days(day,taken,taken_at,last_changed_at) VALUES(?,?,?,?) ON CONFLICT(day) DO UPDATE SET taken=excluded.taken,taken_at=CASE WHEN excluded.taken=1 AND days.taken=0 THEN excluded.taken_at WHEN excluded.taken=0 THEN NULL ELSE days.taken_at END,last_changed_at=CASE WHEN days.taken<>excluded.taken THEN excluded.last_changed_at ELSE days.last_changed_at END",
             day,
             take ? 1 : 0,
             take ? now.toISOString() : null,
             now.toISOString(),
           );
           this.ctx.storage.sql.exec(
-            "UPDATE day_records SET legacy_taken=?,legacy_taken_at=CASE WHEN ?=1 THEN COALESCE(legacy_taken_at,?) ELSE legacy_taken_at END,corrected=CASE WHEN ? THEN 1 ELSE corrected END,corrected_at=CASE WHEN ? THEN ? ELSE corrected_at END,updated_at=? WHERE day=?",
+            "UPDATE day_records SET legacy_taken=?,legacy_taken_at=CASE WHEN ?=1 AND legacy_taken=0 THEN ? WHEN ?=0 THEN NULL ELSE legacy_taken_at END,corrected=CASE WHEN ? THEN 1 ELSE corrected END,corrected_at=CASE WHEN ? THEN ? ELSE corrected_at END,updated_at=? WHERE day=?",
             take ? 1 : 0,
             take ? 1 : 0,
             now.toISOString(),
+            take ? 1 : 0,
             day !== a.day || !take,
             day !== a.day || !take,
             now.toISOString(),

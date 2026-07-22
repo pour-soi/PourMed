@@ -35,6 +35,19 @@ export interface DaySummary {
   takenRequired: number;
 }
 
+export function completionTimestamp(
+  legacyTaken: boolean,
+  legacyTakenAt: string | null,
+  legacyLastChangedAt: string | null,
+  doseTakenAt: Array<string | null>,
+): string | null {
+  const candidates = [
+    legacyTaken ? (legacyLastChangedAt ?? legacyTakenAt) : null,
+    ...doseTakenAt,
+  ].filter((value): value is string => value !== null);
+  return candidates.sort().at(-1) ?? null;
+}
+
 const formatters = new Map<string, Intl.DateTimeFormat>();
 export function zonedParts(date: Date, timeZone: string): ZonedParts {
   let f = formatters.get(timeZone);

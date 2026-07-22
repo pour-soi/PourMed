@@ -4,6 +4,15 @@ All notable changes to PourMed are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-07-22
+
+### Fixed
+
+- Completing a medication day after undoing it now records the fresh completion time instead of retaining an earlier timestamp.
+- Repeated completion actions remain idempotent and preserve the active completion time.
+
+Existing history, settings, time-zone behavior, and push subscriptions are preserved. No database migration is required.
+
 ## [1.2.0] - 2026-07-22
 
 ### Added
@@ -57,3 +66,4 @@ Existing medication history, schedules, time-zone settings, adherence records, a
 [1.0.0]: https://github.com/pour-soi/PourMed/releases/tag/v1.0.0
 [1.1.0]: https://github.com/pour-soi/PourMed/releases/tag/v1.1.0
 [1.2.0]: https://github.com/pour-soi/PourMed/releases/tag/v1.2.0
+[1.2.1]: https://github.com/pour-soi/PourMed/releases/tag/v1.2.1

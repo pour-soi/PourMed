@@ -122,6 +122,24 @@ describe("localization", () => {
   });
 
   it.each([
+    ["2026-01-22T06:09:00Z", "America/Los_Angeles", "10:09 PM"],
+    ["2026-07-22T06:09:00Z", "America/Los_Angeles", "11:09 PM"],
+    ["2026-07-22T06:09:00Z", "America/New_York", "2:09 AM"],
+    ["2026-07-22T06:09:00Z", "Asia/Shanghai", "2:09 PM"],
+  ])(
+    "formats %s in %s without changing the instant",
+    (instant, zone, expected) => {
+      expect(
+        formatDateForLocale(new Date(instant), "en", {
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: zone,
+        }),
+      ).toBe(expected);
+    },
+  );
+
+  it.each([
     ["2026-07-22T07:00:00Z", "2026-07-21"],
     ["2026-07-22T11:00:00Z", "2026-07-21"],
     ["2026-07-22T13:59:00Z", "2026-07-21"],

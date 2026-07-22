@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const html = readFileSync("src/client/index.html", "utf8");
 const client = readFileSync("src/client/main.ts", "utf8");
 const css = readFileSync("src/client/style.css", "utf8");
+const worker = readFileSync("src/worker/index.ts", "utf8");
 
 describe("authentication runtime diagnostics", () => {
   it("disables iPhone token capitalization and correction", () => {
@@ -43,5 +44,15 @@ describe("authentication runtime diagnostics", () => {
     expect(html).toContain("Delayed Test Notification (10 seconds)");
     expect(client).toContain('mutate("/api/push/test")');
     expect(client).toContain('mutate("/api/push/test-delayed")');
+  });
+  it("records a fresh group completion after undo without moving repeated completion times", () => {
+    expect(worker).toContain(
+      "excluded.taken=1 AND days.taken=0 THEN excluded.taken_at",
+    );
+    expect(worker).toContain(
+      "days.taken<>excluded.taken THEN excluded.last_changed_at",
+    );
+    expect(worker).toContain("?=1 AND legacy_taken=0 THEN ?");
+    expect(worker).not.toContain("COALESCE(legacy_taken_at");
   });
 });
