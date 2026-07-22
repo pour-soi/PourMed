@@ -83,6 +83,8 @@ Do not put the access token on a command line or in shell history. Use the app t
 4. Open `secrets/access-token.txt` on your computer and copy the token to the app.
 5. Tap **Save on This Device** and confirm the status loads.
 
+On first authenticated launch, PourMed defaults to **Automatic — Device time zone** and synchronizes the detected IANA identifier to the Worker. Confirm the active zone in Settings before relying on reminders. You can choose a manual IANA zone there when reminders should remain tied to a specific location. The medication day resets at 7:00 AM in the active zone, keeping the default 10:00 PM–4:00 AM reminder window on one medication day across midnight. IANA rules handle daylight-saving-time changes without fixed offsets. Changing zones affects future reminders and does not rewrite history. The one-minute Cloudflare Cron trigger always runs in UTC and requires no per-zone configuration.
+
 The token is stored in same-origin browser storage on that device. Treat the device and token as private.
 
 ## 7. Enable notifications

@@ -8,7 +8,11 @@ import {
   todaySummary,
   type StatisticsPeriod,
 } from "./presentation";
-import { adherence, type DaySummary } from "../shared/domain";
+import {
+  adherence,
+  automaticTimeZoneUpdate,
+  type DaySummary,
+} from "../shared/domain";
 
 type ApiData = Record<string, unknown>;
 type Medication = {
@@ -42,6 +46,7 @@ type Settings = {
   endMinute: number;
   intervalMinute: number;
   timezone: string;
+  timeZoneMode: "automatic" | "manual";
   remindersEnabled: boolean;
   completionMode: "group" | "individual";
   theme: string;
@@ -161,6 +166,41 @@ const minuteValue = (v: string) => {
   const [h, m] = v.split(":").map(Number);
   return h! * 60 + m!;
 };
+const detectedTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+const validTimeZone = (timeZone: string) => {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone }).format();
+    return timeZone.includes("/") || timeZone === "UTC";
+  } catch {
+    return false;
+  }
+};
+function settingsPayload(s: Settings, overrides: Partial<Settings> = {}) {
+  return {
+    startMinute: s.startMinute,
+    endMinute: s.endMinute,
+    intervalMinute: s.intervalMinute,
+    timezone: s.timezone,
+    timeZoneMode: s.timeZoneMode,
+    remindersEnabled: s.remindersEnabled,
+    completionMode: s.completionMode,
+    theme: s.theme,
+    quietPreference: s.quietPreference,
+    badgePreference: s.badgePreference,
+    previewText: s.previewText,
+    ...overrides,
+  };
+}
+function renderTimeZoneControls() {
+  if (!app) return;
+  const automatic = $<HTMLInputElement>("timezone-automatic").checked,
+    detected = detectedTimeZone();
+  $("manual-timezone-field").hidden = automatic;
+  $("timezone-warning").hidden = automatic;
+  $("active-timezone").textContent = automatic
+    ? `Automatic — ${detected}`
+    : `Manual — ${$<HTMLInputElement>("timezone").value}`;
+}
 async function notificationDiagnostics() {
   const supported =
     "Notification" in window &&
@@ -213,7 +253,7 @@ function renderToday() {
     d.status === "taken" ? "✓" : d.status === "partial" ? "◐" : "○";
   $("detail").textContent =
     d.taken && d.takenAt
-      ? `Completed at ${new Date(d.takenAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`
+      ? `Completed at ${new Date(d.takenAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: s.timezone })}.`
       : meds.length
         ? `${d.doses.filter((x) => x.taken).length} of ${d.doses.filter((x) => x.required).length} required medications taken.`
         : "Add medications in Settings, or keep using the group reminder button.";
@@ -257,7 +297,7 @@ function renderToday() {
   $("mark-all").hidden = s.completionMode !== "individual" || d.taken;
   $("undo").hidden = !d.taken;
   $("snooze-state").textContent = app.snoozeUntil
-    ? `Snoozed until ${new Date(app.snoozeUntil).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`
+    ? `Snoozed until ${new Date(app.snoozeUntil).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: s.timezone })}.`
     : "";
   $("cancel-snooze").hidden = !app.snoozeUntil;
   applyTheme(s.theme);
@@ -269,6 +309,10 @@ function renderSettings() {
   $<HTMLInputElement>("end-time").value = timeValue(s.endMinute);
   $<HTMLSelectElement>("interval").value = String(s.intervalMinute);
   $<HTMLInputElement>("timezone").value = s.timezone;
+  $<HTMLInputElement>("timezone-automatic").checked =
+    s.timeZoneMode === "automatic";
+  $<HTMLInputElement>("timezone-manual").checked = s.timeZoneMode === "manual";
+  renderTimeZoneControls();
   $<HTMLInputElement>("reminders-enabled").checked = s.remindersEnabled;
   $<HTMLSelectElement>("completion-mode").value = s.completionMode;
   $<HTMLSelectElement>("theme").value = s.theme;
@@ -506,11 +550,28 @@ async function load() {
   }
   try {
     app = await api<AppData>("/api/status");
+    let timeZoneNotice = "";
+    const deviceTimeZone = detectedTimeZone(),
+      updatedTimeZone = automaticTimeZoneUpdate(
+        app.settings.timeZoneMode,
+        app.settings.timezone,
+        deviceTimeZone,
+      );
+    if (updatedTimeZone) {
+      app = await api<AppData>("/api/settings", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          settingsPayload(app.settings, { timezone: updatedTimeZone }),
+        ),
+      });
+      timeZoneNotice = `Time zone updated to ${updatedTimeZone}.`;
+    }
     statisticsData = null;
     renderToday();
     renderSettings();
     $("connection").textContent = "Online";
-    note("");
+    note(timeZoneNotice);
     localStorage.setItem("pourmed-last-status", JSON.stringify(app));
   } catch (e) {
     $("connection").textContent = navigator.onLine
@@ -591,6 +652,7 @@ function renderSelectedDay(d: Day | undefined, medicationFilter: string) {
         ? new Date(d.takenAt).toLocaleString([], {
             dateStyle: "medium",
             timeStyle: "short",
+            timeZone: app?.settings.timezone,
           })
         : "Not recorded",
     ],
@@ -728,11 +790,20 @@ $<HTMLButtonElement>("cancel-snooze").onclick = () =>
   void api("/api/snooze", { method: "DELETE" }).then(load);
 $<HTMLFormElement>("schedule-form").onsubmit = (e) => {
   e.preventDefault();
+  const automatic = $<HTMLInputElement>("timezone-automatic").checked,
+    timezone = automatic
+      ? detectedTimeZone()
+      : $<HTMLInputElement>("timezone").value.trim();
+  if (!validTimeZone(timezone)) {
+    note("Choose a valid IANA time zone.");
+    return;
+  }
   void mutate("/api/settings", "PUT", {
     startMinute: minuteValue($<HTMLInputElement>("start-time").value),
     endMinute: minuteValue($<HTMLInputElement>("end-time").value),
     intervalMinute: Number($<HTMLSelectElement>("interval").value),
-    timezone: $<HTMLInputElement>("timezone").value,
+    timezone,
+    timeZoneMode: automatic ? "automatic" : "manual",
     remindersEnabled: $<HTMLInputElement>("reminders-enabled").checked,
     completionMode: $<HTMLSelectElement>("completion-mode").value,
     theme: $<HTMLSelectElement>("theme").value,
@@ -746,6 +817,21 @@ $<HTMLFormElement>("schedule-form").onsubmit = (e) => {
     })
     .catch((e) => note(e.message));
 };
+$<HTMLInputElement>("timezone-automatic").onchange = renderTimeZoneControls;
+$<HTMLInputElement>("timezone-manual").onchange = renderTimeZoneControls;
+$<HTMLInputElement>("timezone").oninput = renderTimeZoneControls;
+const timeZones = (
+  Intl as typeof Intl & { supportedValuesOf?: (key: "timeZone") => string[] }
+).supportedValuesOf?.("timeZone") ?? [
+  "America/Los_Angeles",
+  "America/New_York",
+  "Asia/Shanghai",
+  "Europe/London",
+  "UTC",
+];
+$<HTMLDataListElement>("timezone-options").replaceChildren(
+  ...timeZones.map((timeZone) => new Option(timeZone)),
+);
 $<HTMLButtonElement>("add-medication").onclick = () => openMedication();
 $<HTMLButtonElement>("close-med").onclick = () =>
   $<HTMLDialogElement>("med-dialog").close();

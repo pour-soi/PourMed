@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const listed = spawnSync(
   "git",
@@ -14,6 +14,7 @@ const patterns = [
 const hits = [];
 for (const file of listed.stdout.trim().split("\n").filter(Boolean)) {
   if (file === ".dev.vars.example") continue;
+  if (!existsSync(file)) continue;
   const content = readFileSync(file);
   if (content.includes(0)) continue;
   const text = content.toString("utf8");

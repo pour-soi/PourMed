@@ -1,5 +1,6 @@
 export const INTERVALS = [10, 15, 20, 30, 45, 60] as const;
 export type CompletionMode = "group" | "individual";
+export type TimeZoneMode = "automatic" | "manual";
 export type DayStatus =
   | "taken"
   | "partial"
@@ -12,6 +13,7 @@ export interface ScheduleSettings {
   endMinute: number;
   intervalMinute: (typeof INTERVALS)[number];
   timezone: string;
+  timeZoneMode: TimeZoneMode;
   remindersEnabled: boolean;
   completionMode: CompletionMode;
 }
@@ -62,6 +64,25 @@ export function zonedParts(date: Date, timeZone: string): ZonedParts {
     minute: p.minute!,
   };
 }
+export function isValidTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone }).format();
+    return timeZone.includes("/") || timeZone === "UTC";
+  } catch {
+    return false;
+  }
+}
+export function automaticTimeZoneUpdate(
+  mode: TimeZoneMode,
+  savedTimeZone: string,
+  detectedTimeZone: string,
+): string | null {
+  return mode === "automatic" &&
+    savedTimeZone !== detectedTimeZone &&
+    isValidTimeZone(detectedTimeZone)
+    ? detectedTimeZone
+    : null;
+}
 const dateKey = (d: Date) =>
   `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 export function medicationDay(parts: ZonedParts): string {
@@ -74,6 +95,12 @@ export function medicationDay(parts: ZonedParts): string {
       ),
     ),
   );
+}
+export function getMedicationDayKey(
+  instantUtc: Date,
+  timeZone: string,
+): string {
+  return medicationDay(zonedParts(instantUtc, timeZone));
 }
 export const minuteOfDay = (p: ZonedParts) => p.hour * 60 + p.minute;
 export function scheduleDuration(s: ScheduleSettings): number {
@@ -95,7 +122,26 @@ export function scheduledSlot(
 ): string | null {
   if (!s.remindersEnabled || slotOffset(minuteOfDay(parts), s) === null)
     return null;
-  return `${medicationDay(parts)}@${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+  return `${medicationDay(parts)}@${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}|${s.timezone}`;
+}
+export function scheduledSlotForInstant(
+  instantUtc: Date,
+  s: ScheduleSettings,
+  lateMinutes = 5,
+): string | null {
+  const parts = zonedParts(instantUtc, s.timezone);
+  for (let delay = 0; delay <= lateMinutes; delay++) {
+    const minute = minuteOfDay(parts) - delay;
+    if (minute < 0) continue;
+    const intended = {
+      ...parts,
+      hour: Math.floor(minute / 60),
+      minute: minute % 60,
+    };
+    const slot = scheduledSlot(intended, s);
+    if (slot) return slot;
+  }
+  return null;
 }
 export function nextSlotMinute(
   minute: number,

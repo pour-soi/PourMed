@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   adherence,
+  automaticTimeZoneUpdate,
   classifyDay,
   completion,
   medicationDay,
+  getMedicationDayKey,
+  isValidTimeZone,
   nextSlotMinute,
   safeCsv,
   schedulePreview,
   scheduledSlot,
+  scheduledSlotForInstant,
   slotOffset,
   zonedParts,
   type ScheduleSettings,
@@ -17,6 +21,7 @@ const base: ScheduleSettings = {
   endMinute: 240,
   intervalMinute: 30,
   timezone: "America/Los_Angeles",
+  timeZoneMode: "automatic",
   remindersEnabled: true,
   completionMode: "group",
 };
@@ -87,6 +92,57 @@ describe("time zones", () => {
     expect(
       zonedParts(new Date("2026-11-01T09:30:00Z"), base.timezone).hour,
     ).toBe(1);
+  });
+  it.each([
+    ["2026-01-02T06:00:00Z", "America/Los_Angeles", "2026-01-01@22:00"],
+    ["2026-07-02T05:00:00Z", "America/Los_Angeles", "2026-07-01@22:00"],
+    ["2026-01-02T03:00:00Z", "America/New_York", "2026-01-01@22:00"],
+    ["2026-01-01T14:00:00Z", "Asia/Shanghai", "2026-01-01@22:00"],
+  ])("maps %s into %s", (instant, timezone, expected) => {
+    const settings = { ...base, timezone };
+    expect(scheduledSlotForInstant(new Date(instant), settings)).toBe(
+      `${expected}|${timezone}`,
+    );
+  });
+  it("maps overnight instants to the prior medication day", () => {
+    expect(
+      getMedicationDayKey(
+        new Date("2026-07-22T08:00:00Z"),
+        "America/Los_Angeles",
+      ),
+    ).toBe("2026-07-21");
+  });
+  it("deduplicates both fall-back occurrences by intended local slot", () => {
+    const settings = { ...base, startMinute: 60, endMinute: 60 };
+    expect(
+      scheduledSlotForInstant(new Date("2026-11-01T08:00:00Z"), settings),
+    ).toBe(scheduledSlotForInstant(new Date("2026-11-01T09:00:00Z"), settings));
+  });
+  it("uses the intended slot when Cron arrives a few minutes late", () => {
+    expect(
+      scheduledSlotForInstant(new Date("2026-07-02T05:03:00Z"), base),
+    ).toBe("2026-07-01@22:00|America/Los_Angeles");
+  });
+  it("validates canonical IANA identifiers", () => {
+    expect(isValidTimeZone("Europe/London")).toBe(true);
+    expect(isValidTimeZone("PST")).toBe(false);
+    expect(isValidTimeZone("not/a-zone")).toBe(false);
+  });
+  it("updates automatic mode but never overwrites manual mode", () => {
+    expect(
+      automaticTimeZoneUpdate(
+        "automatic",
+        "America/Los_Angeles",
+        "America/New_York",
+      ),
+    ).toBe("America/New_York");
+    expect(
+      automaticTimeZoneUpdate(
+        "manual",
+        "America/Los_Angeles",
+        "America/New_York",
+      ),
+    ).toBeNull();
   });
 });
 describe("completion and statistics", () => {

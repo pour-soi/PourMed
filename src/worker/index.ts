@@ -6,15 +6,17 @@ import {
 import {
   classifyDay,
   formatMinute,
-  medicationDay,
+  getMedicationDayKey,
+  isValidTimeZone,
   nextSlotMinute,
   schedulePreview,
   safeCsv,
-  scheduledSlot,
+  scheduledSlotForInstant,
   zonedParts,
   type CompletionMode,
   type DayStatus,
   type ScheduleSettings,
+  type TimeZoneMode,
 } from "../shared/domain";
 import type { Env } from "./types";
 
@@ -123,6 +125,7 @@ interface SettingsRow {
   end_minute: number;
   interval_minute: number;
   timezone: string;
+  time_zone_mode: TimeZoneMode;
   reminders_enabled: number;
   completion_mode: CompletionMode;
   theme: string;
@@ -166,8 +169,8 @@ export class MedicationState extends DurableObject<Env> {
     CREATE TABLE IF NOT EXISTS config(key TEXT PRIMARY KEY,value TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS schema_meta(version INTEGER NOT NULL);
     INSERT INTO schema_meta(version) SELECT 2 WHERE NOT EXISTS(SELECT 1 FROM schema_meta);
-    CREATE TABLE IF NOT EXISTS settings(id INTEGER PRIMARY KEY CHECK(id=1),start_minute INTEGER NOT NULL,end_minute INTEGER NOT NULL,interval_minute INTEGER NOT NULL,timezone TEXT NOT NULL,reminders_enabled INTEGER NOT NULL,completion_mode TEXT NOT NULL,theme TEXT NOT NULL,quiet_preference INTEGER NOT NULL,badge_preference INTEGER NOT NULL,preview_text TEXT NOT NULL,updated_at TEXT NOT NULL);
-    INSERT OR IGNORE INTO settings VALUES(1,1320,240,30,'America/Los_Angeles',1,'group','system',0,1,'',CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS settings(id INTEGER PRIMARY KEY CHECK(id=1),start_minute INTEGER NOT NULL,end_minute INTEGER NOT NULL,interval_minute INTEGER NOT NULL,timezone TEXT NOT NULL,time_zone_mode TEXT NOT NULL DEFAULT 'automatic',reminders_enabled INTEGER NOT NULL,completion_mode TEXT NOT NULL,theme TEXT NOT NULL,quiet_preference INTEGER NOT NULL,badge_preference INTEGER NOT NULL,preview_text TEXT NOT NULL,updated_at TEXT NOT NULL);
+    INSERT OR IGNORE INTO settings(id,start_minute,end_minute,interval_minute,timezone,reminders_enabled,completion_mode,theme,quiet_preference,badge_preference,preview_text,updated_at) VALUES(1,1320,240,30,'America/Los_Angeles',1,'group','system',0,1,'',CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS medications(id TEXT PRIMARY KEY,name TEXT NOT NULL,dosage TEXT,instructions TEXT,enabled INTEGER NOT NULL,required INTEGER NOT NULL,display_order INTEGER NOT NULL,notes TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS day_records(day TEXT PRIMARY KEY,legacy_taken INTEGER NOT NULL DEFAULT 0,legacy_taken_at TEXT,note TEXT,corrected INTEGER NOT NULL DEFAULT 0,corrected_at TEXT,updated_at TEXT NOT NULL);
     INSERT OR IGNORE INTO day_records(day,legacy_taken,legacy_taken_at,updated_at) SELECT day,taken,taken_at,last_changed_at FROM days;
@@ -179,6 +182,16 @@ export class MedicationState extends DurableObject<Env> {
     CREATE TABLE IF NOT EXISTS idempotency(key TEXT PRIMARY KEY,response TEXT NOT NULL,created_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS push_events(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,status TEXT NOT NULL,error_code TEXT,occurred_at TEXT NOT NULL);
   `);
+      const settingsColumns = [
+        ...this.ctx.storage.sql.exec<{ name: string }>(
+          "PRAGMA table_info(settings)",
+        ),
+      ];
+      if (!settingsColumns.some((column) => column.name === "time_zone_mode"))
+        this.ctx.storage.sql.exec(
+          "ALTER TABLE settings ADD COLUMN time_zone_mode TEXT NOT NULL DEFAULT 'automatic'",
+        );
+      this.ctx.storage.sql.exec("UPDATE schema_meta SET version=3");
     });
   }
   private settings(): ScheduleSettings & {
@@ -197,6 +210,7 @@ export class MedicationState extends DurableObject<Env> {
       endMinute: r.end_minute,
       intervalMinute: r.interval_minute as ScheduleSettings["intervalMinute"],
       timezone: r.timezone,
+      timeZoneMode: r.time_zone_mode,
       remindersEnabled: !!r.reminders_enabled,
       completionMode: r.completion_mode,
       theme: r.theme,
@@ -288,7 +302,7 @@ export class MedicationState extends DurableObject<Env> {
   private active(now = new Date()) {
     const settings = this.settings(),
       local = zonedParts(now, settings.timezone),
-      day = medicationDay(local),
+      day = getMedicationDayKey(now, settings.timezone),
       minute = local.hour * 60 + local.minute,
       duration =
         settings.endMinute >= settings.startMinute
@@ -435,7 +449,7 @@ export class MedicationState extends DurableObject<Env> {
           new Date(now.getTime() - 10 * 60000).toISOString(),
         ),
       ][0];
-      slot = failed?.slot ?? scheduledSlot(a.local, a.settings);
+      slot = failed?.slot ?? scheduledSlotForInstant(now, a.settings);
     }
     if (!slot) return { sent: false, reason: "NOT_A_SLOT" };
     const existing = [
@@ -521,11 +535,11 @@ export class MedicationState extends DurableObject<Env> {
       subscriptionActive: subscription,
       vapidPublicKey: this.env.VAPID_PUBLIC_KEY,
       diagnostics: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         expectedTokenLength: Number(this.env.ACCESS_TOKEN_LENGTH) || null,
         lastSuccessfulPush: lastPush,
         lastPushError: lastError,
-        serviceWorkerVersion: "v8",
+        serviceWorkerVersion: "v9",
       },
       activeMedicationCount: active.length,
     };
@@ -582,6 +596,7 @@ export class MedicationState extends DurableObject<Env> {
           end = Number(x.endMinute),
           interval = Number(x.intervalMinute),
           timezone = text(x.timezone, "Timezone", 100)!,
+          timeZoneMode = String(x.timeZoneMode),
           mode = x.completionMode,
           theme = x.theme;
         if (
@@ -593,24 +608,23 @@ export class MedicationState extends DurableObject<Env> {
           end > 1439 ||
           ![10, 15, 20, 30, 45, 60].includes(interval) ||
           !["group", "individual"].includes(String(mode)) ||
-          !["light", "dark", "system"].includes(String(theme))
+          !["light", "dark", "system"].includes(String(theme)) ||
+          !["automatic", "manual"].includes(timeZoneMode)
         )
           throw new ApiError(
             400,
             "INVALID_SETTINGS",
             "Schedule settings are invalid.",
           );
-        try {
-          new Intl.DateTimeFormat("en", { timeZone: timezone }).format();
-        } catch {
+        if (!isValidTimeZone(timezone))
           throw new ApiError(400, "INVALID_TIMEZONE", "Timezone is invalid.");
-        }
         this.ctx.storage.sql.exec(
-          "UPDATE settings SET start_minute=?,end_minute=?,interval_minute=?,timezone=?,reminders_enabled=?,completion_mode=?,theme=?,quiet_preference=?,badge_preference=?,preview_text=?,updated_at=? WHERE id=1",
+          "UPDATE settings SET start_minute=?,end_minute=?,interval_minute=?,timezone=?,time_zone_mode=?,reminders_enabled=?,completion_mode=?,theme=?,quiet_preference=?,badge_preference=?,preview_text=?,updated_at=? WHERE id=1",
           start,
           end,
           interval,
           timezone,
+          timeZoneMode,
           x.remindersEnabled ? 1 : 0,
           mode,
           theme,
@@ -950,7 +964,7 @@ export class MedicationState extends DurableObject<Env> {
           });
         }
         return ok({
-          schemaVersion: 2,
+          schemaVersion: 3,
           exportedAt: now.toISOString(),
           settings,
           medications,

@@ -190,6 +190,40 @@
               Technical notification status is available in Advanced below.
             </p>
           </section>
+          <section class="card form-grid" aria-labelledby="timezone-heading">
+            <h3 id="timezone-heading">Time Zone</h3>
+            <label class="check"
+              ><input
+                id="timezone-automatic"
+                name="timezone-mode"
+                type="radio"
+                value="automatic"
+                checked
+              />
+              Automatic — Device time zone</label
+            ><label class="check"
+              ><input
+                id="timezone-manual"
+                name="timezone-mode"
+                type="radio"
+                value="manual"
+              />
+              Manual time zone</label
+            >
+            <p class="muted" id="active-timezone"></p>
+            <label id="manual-timezone-field" hidden
+              >IANA time zone<input
+                id="timezone"
+                list="timezone-options"
+                maxlength="100"
+                autocomplete="off"
+                required /></label
+            ><datalist id="timezone-options"></datalist>
+            <p class="muted" id="timezone-warning" hidden>
+              Future reminders will use this time zone. Existing history will
+              not be changed.
+            </p>
+          </section>
           <section class="card form-grid" aria-labelledby="appearance-heading">
             <h3 id="appearance-heading">Appearance</h3>
             <label
@@ -203,13 +237,6 @@
           <button class="primary" type="submit">Save Settings</button>
           <details class="card" id="advanced-settings">
             <summary>Advanced</summary>
-            <label
-              >Timezone<input
-                id="timezone"
-                value="America/Los_Angeles"
-                maxlength="100"
-                required
-            /></label>
             <h3>Technical diagnostics</h3>
             <dl class="diagnostics">
               <dt>Server authentication</dt>

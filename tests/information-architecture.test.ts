@@ -28,6 +28,15 @@ describe("history information architecture", () => {
 });
 
 describe("settings and today organization", () => {
+  it("offers accessible automatic and manual IANA time-zone controls", () => {
+    expect(html).toContain('id="timezone-heading"');
+    expect(html).toContain('id="timezone-automatic"');
+    expect(html).toContain('id="timezone-manual"');
+    expect(html).toContain('list="timezone-options"');
+    expect(html).toContain("Existing history will");
+    expect(client).toContain("resolvedOptions().timeZone");
+    expect(client).toContain("automaticTimeZoneUpdate(");
+  });
   it("orders daily settings before one advanced section", () => {
     const schedule = html.indexOf('id="schedule-heading"');
     const notifications = html.indexOf('id="notifications-heading"');

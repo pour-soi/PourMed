@@ -31,6 +31,7 @@ See the [screenshot safety record](docs/images/README.md) for the capture constr
 ## Features
 
 - Recurring, timezone-aware medication reminders
+- Automatic device time-zone detection with a manual IANA time-zone override
 - Web Push notifications
 - iPhone Home Screen PWA support
 - Immediate and delayed notification testing
@@ -144,6 +145,8 @@ See the [complete deployment guide](docs/DEPLOYMENT.md) before deploying.
 | `MEDICATION_STATE`    | Durable Object binding | Public configuration | Binds the `MedicationState` class and its single-user SQLite storage                               |
 
 `wrangler.jsonc` exports `MedicationState` as a SQLite-backed Durable Object. Application schema upgrades are additive and run inside that object; see [Migrations](docs/MIGRATIONS.md). The Cron expression is `* * * * *` and only checks eligibility—configured schedule and stored reminder slots determine whether anything is sent.
+
+PourMed defaults to the device's IANA time zone and synchronizes it when the app opens. A manual override is available in Settings for travel or a schedule tied to another location. The medication day resets at 7:00 AM in the active time zone, so completion before 7:00 AM belongs to the previous medication day and the default 10:00 PM–4:00 AM reminder window remains one medication day across midnight. Cloudflare Cron remains in UTC; the Worker uses runtime IANA conversions for daylight-saving transitions. Changing time zones affects future reminders only and never rewrites historical medication-day records.
 
 ## Local development
 
