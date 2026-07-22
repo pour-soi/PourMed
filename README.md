@@ -12,7 +12,21 @@ PourMed is a single-user application that you deploy to your own Cloudflare acco
 
 ## Screenshots
 
-No screenshots are committed yet. The repository includes [safe screenshot guidelines](docs/images/README.md) for future synthetic captures; no broken or fabricated image references are used here.
+All screenshots come from an isolated local PourMed instance with synthetic medications, history, credentials, and push-subscription data. No production deployment or personal data was used.
+
+| Ready for the evening routine                                                                               | Medication day completed                                                                               |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| ![PourMed Home showing two synthetic medications not yet taken and the next reminder](docs/images/home.png) | ![PourMed Home showing the synthetic medications completed for the evening](docs/images/completed.png) |
+
+| History                                                                                                      | Statistics                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| ![PourMed History showing synthetic completed, missed, and partial medication days](docs/images/history.png) | ![PourMed Statistics showing synthetic adherence, streaks, and completion timeline](docs/images/statistics.png) |
+
+### Notification diagnostics
+
+![PourMed technical diagnostics showing authenticated local demo status, synthetic push subscription state, and service worker version](docs/images/notifications-diagnostics.png)
+
+See the [screenshot safety record](docs/images/README.md) for the capture constraints.
 
 ## Features
 

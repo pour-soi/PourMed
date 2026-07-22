@@ -1,13 +1,23 @@
-# Screenshot guidelines
+# Screenshot safety record
 
-This directory is reserved for public PourMed screenshots. No screenshots are currently committed because a safe synthetic capture set has not yet been independently verified.
+The README screenshots were captured from the real PourMed application running as an isolated local Cloudflare Worker with a separate temporary SQLite Durable Object store.
 
-Future screenshots must:
+The demo uses only synthetic data:
 
-- use only synthetic medication names, dates, notes, and completion history;
-- show no access token, VAPID key, push endpoint, Cloudflare Account ID, or browser storage;
-- show no personal deployment URL or Cloudflare dashboard;
-- hide the browser address bar or use a generic host such as `https://your-project.workers.dev`;
-- be mobile-sized, optimized, and reviewed before they are linked from the README.
+- generic `Evening tablet` and `Daily supplement` medication names;
+- 20 generated medication days with taken, missed, and partial states;
+- a disposable access token and VAPID key pair generated solely for the local session;
+- a reserved `.invalid` push endpoint representing an active subscription;
+- no Cloudflare account, remote Worker, or production deployment.
 
-Suggested files are `today.png`, `history.png`, `statistics.png`, and `notifications.png`.
+The access token was never rendered in a screenshot. The diagnostics capture shows token length only and has an empty access field. Images contain no production URL, Account ID, credentials, personal medication record, private push endpoint, browser chrome, or debug console.
+
+Files:
+
+- `home.png` — active medication day before completion;
+- `completed.png` — successful completion state;
+- `history.png` — calendar and day summary with synthetic history;
+- `statistics.png` — adherence, streaks, summary cards, and timeline;
+- `notifications-diagnostics.png` — authentication, subscription, and service-worker diagnostics with an empty token field.
+
+All PNGs use an iPhone-width viewport and an optimized 64-color palette.
