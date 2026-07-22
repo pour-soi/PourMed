@@ -1,0 +1,44 @@
+name: Feature request
+description: Describe a user problem or use case
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Start with the problem and user need rather than only a proposed implementation.
+
+        **Do not include access tokens, private keys, medication history, Cloudflare credentials, Account IDs, database exports, or personal deployment URLs.**
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is difficult or missing today?
+    validations:
+      required: true
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use case
+      description: Who benefits and what outcome are they trying to achieve?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe successful user-visible behavior without prescribing internal architecture.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: This request contains no secrets, personal medication data, private URLs, or production identifiers.
+          required: true

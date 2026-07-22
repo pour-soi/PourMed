@@ -36,19 +36,12 @@ The command creates two ignored, mode-600 files:
 
 The command does not print private values. Store these files securely. If the access token is lost, it cannot be recovered from the Worker verifier.
 
-## 4. Create the Worker secrets
+## 4. Prepare the Worker secrets
 
-Upload the generated secrets to your own Worker:
-
-```sh
-pnpm wrangler secret bulk secrets/wrangler-secrets.env
-pnpm wrangler secret put VAPID_SUBJECT
-```
-
-When prompted for `VAPID_SUBJECT`, enter a contact URI you control, such as:
+Open `secrets/wrangler-secrets.env` in a local editor and add a contact URI you control:
 
 ```text
-mailto:you@example.com
+VAPID_SUBJECT=mailto:you@example.com
 ```
 
 The required secrets are:
@@ -59,13 +52,13 @@ The required secrets are:
 - `VAPID_PRIVATE_KEY`
 - `VAPID_SUBJECT`
 
-Never paste their values into source files or commit the generated files.
+Never paste their values into source files or commit the generated files. For a first deployment, Wrangler can upload this ignored file together with the Worker code.
 
 ## 5. Validate and deploy
 
 ```sh
 pnpm verify
-pnpm deploy
+pnpm exec wrangler deploy --secrets-file secrets/wrangler-secrets.env
 ```
 
 Wrangler creates the Worker, static assets, Cron Trigger, and SQLite Durable Object in your account. It reports your deployment URL and deployment ID. Your URL will use your own subdomain, for example:

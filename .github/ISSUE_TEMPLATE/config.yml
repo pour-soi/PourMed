@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/pour-soi/PourMed/security/policy
+    about: Follow the private reporting instructions; never disclose a vulnerability or secret in a public issue.
+  - name: Medication emergency or medical advice
+    url: https://www.usa.gov/emergency-services
+    about: PourMed is not an emergency service or source of medical advice. Contact an appropriate local professional.

@@ -31,12 +31,11 @@ pnpm install
 pnpm wrangler login
 pnpm wrangler whoami
 pnpm secrets:generate
-pnpm wrangler secret bulk secrets/wrangler-secrets.env
-pnpm wrangler secret put VAPID_SUBJECT
-pnpm deploy
+pnpm verify
+pnpm exec wrangler deploy --secrets-file secrets/wrangler-secrets.env
 ```
 
-为 `VAPID_SUBJECT` 输入类似 `mailto:you@example.com` 的联系方式。部署完成后，在您自己的地址（例如 `https://your-project.workers.dev`）打开应用。然后在本机打开 `secrets/access-token.txt`，将令牌复制到 PourMed。不要把令牌粘贴到问题、日志、聊天或源文件中。
+部署前，请在本机编辑 `secrets/wrangler-secrets.env`，添加类似 `VAPID_SUBJECT=mailto:you@example.com` 的联系方式。此文件已被 Git 忽略，绝不能提交。部署完成后，在您自己的地址（例如 `https://your-project.workers.dev`）打开应用。然后在本机打开 `secrets/access-token.txt`，将令牌复制到 PourMed。不要把令牌粘贴到问题、日志、聊天或源文件中。
 
 完整步骤、通知设置和验证方法见[部署指南](docs/DEPLOYMENT.md)。本地开发与测试见[测试说明](docs/TESTING.md)。
 
