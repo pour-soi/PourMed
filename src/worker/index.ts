@@ -19,6 +19,7 @@ import {
   type TimeZoneMode,
 } from "../shared/domain";
 import type { Env } from "./types";
+import { healthPayload } from "../shared/version";
 
 const securityHeaders = {
   "cache-control": "no-store",
@@ -1064,8 +1065,7 @@ export class MedicationState extends DurableObject<Env> {
 export default {
   async fetch(req: Request, env: Env) {
     const u = new URL(req.url);
-    if (u.pathname === "/api/health")
-      return ok({ service: "pourmed", version: "1.0.0" });
+    if (u.pathname === "/api/health") return ok(healthPayload());
     if (u.pathname.startsWith("/api/")) {
       const state = env.MEDICATION_STATE.get(
         env.MEDICATION_STATE.idFromName("single-user"),
