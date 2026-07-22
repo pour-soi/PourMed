@@ -19,7 +19,7 @@ describe("statistics dashboard", () => {
     expect(client).toContain("statisticsData ??=");
   });
   it("renders cards in the requested stable order", () => {
-    const adherence = client.indexOf('el("span", "Adherence")');
+    const adherence = client.indexOf('el("span", t("Adherence"))');
     const current = client.indexOf('["Current streak", "currentStreak"]');
     const longest = client.indexOf('["Longest streak", "longestStreak"]');
     const taken = client.indexOf('["Taken days", "takenDays"]');
@@ -36,7 +36,7 @@ describe("statistics dashboard", () => {
     expect(html).toContain("No medication history yet.");
     expect(html).toContain('id="consistency-summary"');
     expect(html).toContain('id="stats-timeline"');
-    expect(client).toContain('button.setAttribute("aria-label"');
+    expect(client).toContain("copy.timelineLabel(date, status, completion)");
     expect(client).toContain("openHistoryFromStatistics(day.day)");
     expect(css).toContain("font-variant-numeric: tabular-nums");
     expect(css).toContain("animation: stat-update");

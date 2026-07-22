@@ -23,7 +23,7 @@ describe("authentication runtime diagnostics", () => {
     expect(client).toContain("notificationDiagnostics()");
     expect(client).toContain("serviceWorker.getRegistration()");
     expect(client).toContain("pushManager.getSubscription()");
-    expect(client).toContain("Notification diagnostics failed:");
+    expect(client).toContain("note(errorMessage(error))");
     expect(html).toContain('id="server-token-length"');
   });
   it("sends the update command to a waiting worker and reloads on activation", () => {

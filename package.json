@@ -1,6 +1,6 @@
 {
   "name": "pourmed",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "packageManager": "pnpm@11.9.0",
   "type": "module",
@@ -20,8 +20,9 @@
     "verify:production": "node scripts/verify-production.mjs",
     "verify:v2-api": "node scripts/verify-v2-api.mjs",
     "secret:scan": "node scripts/secret-scan.mjs",
+    "verify:localization": "node scripts/verify-localization.mjs",
     "screenshots": "node scripts/screenshots/capture.mjs",
-    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm verify:assets && pnpm secret:scan && pnpm audit --prod",
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm verify:assets && pnpm verify:localization && pnpm secret:scan && pnpm audit --prod",
     "deploy": "wrangler deploy"
   },
   "dependencies": {

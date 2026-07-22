@@ -1,5 +1,7 @@
 # PourMed
 
+English | [简体中文](README.zh-CN.md)
+
 [![GitHub release](https://img.shields.io/github/v/release/pour-soi/PourMed?display_name=tag)](https://github.com/pour-soi/PourMed/releases)
 [![CI](https://github.com/pour-soi/PourMed/actions/workflows/ci.yml/badge.svg)](https://github.com/pour-soi/PourMed/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/github/license/pour-soi/PourMed)](LICENSE)
@@ -21,6 +23,7 @@ PourMed is a single-user application that you deploy to your own Cloudflare acco
 ## Features
 
 - Recurring, timezone-aware medication reminders
+- English and Simplified Chinese interfaces with an in-app language switcher
 - Automatic device time-zone detection with a manual IANA time-zone override
 - Web Push notifications
 - iPhone Home Screen PWA support
@@ -97,7 +100,7 @@ Automatic mode follows the device's IANA time zone, with a validated manual over
     <td width="50%" align="center">
       <img
         src="docs/images/notifications-status-light.png"
-        alt="PourMed diagnostics showing authenticated access, granted notification permission, an active synthetic subscription, and Service Worker v9"
+        alt="PourMed diagnostics showing authenticated access, granted notification permission, an active synthetic subscription, and Service Worker v10"
       />
       <br />
       <sub>Healthy notification status</sub>

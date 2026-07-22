@@ -13,7 +13,7 @@ describe("service worker contract", () => {
     expect(sw).toContain('openWindow("/")');
   });
   it("waits for an explicit update command and reloads clients after activation", () => {
-    expect(sw).toContain('CACHE = "pourmed-shell-v9"');
+    expect(sw).toContain('CACHE = "pourmed-shell-v10"');
     expect(sw).toContain('e.data?.type === "SKIP_WAITING"');
     expect(sw).toContain("e.waitUntil(self.skipWaiting())");
     expect(sw).toContain("self.clients.claim()");

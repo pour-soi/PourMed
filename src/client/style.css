@@ -17,6 +17,10 @@
     sans-serif;
   font-size: clamp(16px, 3.8vw, 19px);
 }
+
+html:not([data-locale-ready]) body {
+  visibility: hidden;
+}
 :root[data-theme="dark"] {
   color-scheme: dark;
   --bg: #0d1d1a;

@@ -13,6 +13,20 @@ import {
   automaticTimeZoneUpdate,
   type DaySummary,
 } from "../shared/domain";
+import {
+  copy,
+  formatClockMinute,
+  formatDate,
+  formatNumber,
+  initializeLocale,
+  locale,
+  setLocale,
+  t,
+  translateDocument,
+  type Locale,
+} from "./i18n";
+
+initializeLocale();
 
 type ApiData = Record<string, unknown>;
 type Medication = {
@@ -61,7 +75,9 @@ type AppData = {
   settings: Settings;
   medications: Medication[];
   nextReminder: string | null;
+  nextReminderMinute?: number | null;
   reminderEnd: string;
+  reminderEndMinute?: number;
   snoozeUntil: string | null;
   subscriptionActive: boolean;
   vapidPublicKey: string;
@@ -98,6 +114,19 @@ class ApiError extends Error {
 }
 const note = (s: string) => {
   message.textContent = s;
+};
+const errorMessage = (error: unknown) => {
+  if (locale() === "en") return (error as Error).message;
+  if (error instanceof ApiError && error.status === 401)
+    return t("Invalid access token");
+  if (error instanceof ApiError && error.code === "INVALID_TIMEZONE")
+    return t("Invalid time zone");
+  const raw = (error as Error).message ?? "";
+  if (/permission.*(denied|not granted)/i.test(raw))
+    return t("Notification permission was denied");
+  if (/unsupported/i.test(raw))
+    return t("Notifications are not supported on this device");
+  return t("Something went wrong. Please try again.");
 };
 const idempotency = () => crypto.randomUUID();
 function storedToken() {
@@ -150,6 +179,16 @@ async function mutate(
     body: JSON.stringify(data),
   });
 }
+async function syncLanguage() {
+  if (!storedToken()) return;
+  try {
+    if (localStorage.getItem("pourmed-language-synced") === locale()) return;
+    await mutate("/api/language", "PUT", { language: locale() });
+    localStorage.setItem("pourmed-language-synced", locale());
+  } catch (error) {
+    note(errorMessage(error));
+  }
+}
 const el = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
   text?: string,
@@ -198,8 +237,8 @@ function renderTimeZoneControls() {
   $("manual-timezone-field").hidden = automatic;
   $("timezone-warning").hidden = automatic;
   $("active-timezone").textContent = automatic
-    ? `Automatic — ${detected}`
-    : `Manual — ${$<HTMLInputElement>("timezone").value}`;
+    ? copy.automaticZone(detected)
+    : copy.manualZone($<HTMLInputElement>("timezone").value);
 }
 async function notificationDiagnostics() {
   const supported =
@@ -231,8 +270,9 @@ async function notificationDiagnostics() {
   } catch (error) {
     $("subscription-state").textContent = "Check failed";
     $("sw-version").textContent = "Check failed";
-    note(`Notification diagnostics failed: ${(error as Error).message}`);
+    note(errorMessage(error));
   }
+  translateDocument();
 }
 function applyTheme(theme: string) {
   document.documentElement.dataset.theme = theme === "system" ? "" : theme;
@@ -247,25 +287,47 @@ function renderToday() {
       remindersEnabled: s.remindersEnabled,
       nextReminder: app.nextReminder,
     });
-  $("day").textContent = `Medication day ${app.day}`;
+  $("day").textContent = copy.medicationDay(app.day);
   $("status").textContent = summary.status;
   $("status-icon").textContent =
     d.status === "taken" ? "✓" : d.status === "partial" ? "◐" : "○";
   $("detail").textContent =
     d.taken && d.takenAt
-      ? `Completed at ${new Date(d.takenAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: s.timezone })}.`
+      ? copy.completedAt(
+          formatDate(new Date(d.takenAt), {
+            hour: "numeric",
+            minute: "2-digit",
+            timeZone: s.timezone,
+          }),
+        )
       : meds.length
-        ? `${d.doses.filter((x) => x.taken).length} of ${d.doses.filter((x) => x.required).length} required medications taken.`
-        : "Add medications in Settings, or keep using the group reminder button.";
-  $("schedule-summary").textContent = s.preview;
-  $("next-reminder").textContent = summary.reminder;
-  $("today-summary-day").textContent = new Date(
-    `${app.day}T12:00:00`,
-  ).toLocaleDateString([], { dateStyle: "full" });
+        ? copy.doseCount(
+            d.doses.filter((x) => x.taken).length,
+            d.doses.filter((x) => x.required).length,
+          )
+        : copy.addMedicationHint();
+  $("schedule-summary").textContent = copy.schedulePreview(
+    formatClockMinute(s.startMinute),
+    formatClockMinute(s.endMinute),
+    s.intervalMinute,
+  );
+  $("next-reminder").textContent =
+    app.nextReminderMinute === undefined || app.nextReminderMinute === null
+      ? summary.reminder
+      : formatClockMinute(app.nextReminderMinute);
+  $("today-summary-day").textContent = formatDate(
+    new Date(`${app.day}T12:00:00`),
+    { dateStyle: "full" },
+  );
   $("today-summary-status").textContent = summary.status;
-  $("today-summary-next").textContent = summary.reminder;
-  $("today-summary-interval").textContent = `${s.intervalMinute} minutes`;
-  $("today-summary-end").textContent = app.reminderEnd;
+  $("today-summary-next").textContent =
+    app.nextReminderMinute === undefined || app.nextReminderMinute === null
+      ? summary.reminder
+      : formatClockMinute(app.nextReminderMinute);
+  $("today-summary-interval").textContent = copy.interval(s.intervalMinute);
+  $("today-summary-end").textContent = formatClockMinute(
+    app.reminderEndMinute ?? s.endMinute,
+  );
   const list = $("today-medications");
   list.replaceChildren();
   for (const med of meds) {
@@ -275,14 +337,14 @@ function renderToday() {
     icon.setAttribute("aria-hidden", "true");
     const label = el(
       "span",
-      `${med.name}${med.dosage ? ` — ${med.dosage}` : ""}${med.required ? "" : " (optional)"}`,
+      copy.medicationLabel(med.name, med.dosage, !!med.required),
     );
     li.append(icon, label);
     if (s.completionMode === "individual") {
       const b = el("button", dose?.taken ? "Undo" : "Taken");
       b.setAttribute(
         "aria-label",
-        `${dose?.taken ? "Mark not taken" : "Mark taken"}: ${med.name}`,
+        `${t(dose?.taken ? "Mark not taken" : "Mark taken")}: ${med.name}`,
       );
       b.onclick = () => void setTaken(!dose?.taken, med.id);
       li.append(b);
@@ -297,14 +359,22 @@ function renderToday() {
   $("mark-all").hidden = s.completionMode !== "individual" || d.taken;
   $("undo").hidden = !d.taken;
   $("snooze-state").textContent = app.snoozeUntil
-    ? `Snoozed until ${new Date(app.snoozeUntil).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: s.timezone })}.`
+    ? copy.snoozedUntil(
+        formatDate(new Date(app.snoozeUntil), {
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: s.timezone,
+        }),
+      )
     : "";
   $("cancel-snooze").hidden = !app.snoozeUntil;
   applyTheme(s.theme);
+  translateDocument();
 }
 function renderSettings() {
   if (!app) return;
   const s = app.settings;
+  $<HTMLSelectElement>("language").value = locale();
   $<HTMLInputElement>("start-time").value = timeValue(s.startMinute);
   $<HTMLInputElement>("end-time").value = timeValue(s.endMinute);
   $<HTMLSelectElement>("interval").value = String(s.intervalMinute);
@@ -326,13 +396,13 @@ function renderSettings() {
     const row = el("div", undefined, "med-row"),
       name = el(
         "div",
-        `${m.enabled ? "" : "Disabled — "}${m.name}${m.dosage ? ` — ${m.dosage}` : ""}${m.required ? "" : " (optional)"}`,
+        `${m.enabled ? "" : `${t("Disabled")} — `}${copy.medicationLabel(m.name, m.dosage, !!m.required)}`,
         "grow",
       ),
-      edit = el("button", "Edit"),
+      edit = el("button", t("Edit")),
       up = el("button", "↑"),
       down = el("button", "↓"),
-      del = el("button", "Delete");
+      del = el("button", t("Delete"));
     edit.onclick = () => openMedication(m);
     up.disabled = index === 0;
     down.disabled = index === meds.length - 1;
@@ -344,7 +414,7 @@ function renderSettings() {
   }
   const mf = $<HTMLSelectElement>("medication-filter");
   mf.replaceChildren(
-    new Option("All medications", "all"),
+    new Option(t("All medications"), "all"),
     ...meds.map((m) => new Option(m.name, m.id)),
   );
   const diag = app.diagnostics;
@@ -359,10 +429,15 @@ function renderSettings() {
     : "Missing";
   $("sw-version").textContent = diag.serviceWorkerVersion;
   $("last-push").textContent = diag.lastSuccessfulPush
-    ? new Date(diag.lastSuccessfulPush).toLocaleString()
+    ? formatDate(new Date(diag.lastSuccessfulPush), {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: s.timezone,
+      })
     : "None recorded";
   $("last-push-error").textContent = diag.lastPushError ?? "None recorded";
   void notificationDiagnostics();
+  translateDocument();
 }
 function renderHistory() {
   if (!app) return;
@@ -380,7 +455,7 @@ function renderHistory() {
   calendar.replaceChildren();
   calendar.setAttribute(
     "aria-label",
-    new Date(`${month}-01T12:00:00`).toLocaleDateString([], {
+    formatDate(new Date(`${month}-01T12:00:00`), {
       month: "long",
       year: "numeric",
     }),
@@ -398,7 +473,7 @@ function renderHistory() {
       el("span", String(Number(d.day.slice(-2))), "calendar-day-number"),
       el("span", shortHistoryStatus(d.status), "calendar-status"),
     );
-    const fullDate = new Date(`${d.day}T12:00:00`).toLocaleDateString([], {
+    const fullDate = formatDate(new Date(`${d.day}T12:00:00`), {
       dateStyle: "full",
     });
     cell.setAttribute(
@@ -413,6 +488,7 @@ function renderHistory() {
     filtered.find((day) => day.day === selectedDay),
     med,
   );
+  translateDocument();
 }
 function renderStats(data: StatsResponse) {
   const period = $<HTMLSelectElement>("stats-period").value as StatisticsPeriod,
@@ -428,39 +504,39 @@ function renderStats(data: StatsResponse) {
   content.hidden = !hasPeriodHistory;
   if (!hasPeriodHistory) {
     $("stats-empty-title").textContent = hasAnyHistory
-      ? "No medication history for this period."
-      : "No medication history yet.";
+      ? t("No medication history for this period.")
+      : t("No medication history yet.");
     $("stats-empty-detail").textContent = hasAnyHistory
-      ? "Choose another period to view adherence and streaks."
-      : "Complete your first medication day to start tracking adherence and streaks.";
+      ? t("Choose another period to view adherence and streaks.")
+      : t(
+          "Complete your first medication day to start tracking adherence and streaks.",
+        );
     return;
   }
   grid.replaceChildren();
   const adherenceCard = el("article", undefined, "stat adherence-stat"),
-    adherenceValue = el("strong", `${stats.adherencePercent}%`),
+    adherenceValue = el("strong", `${formatNumber(stats.adherencePercent)}%`),
     adherenceDetail = el(
       "span",
-      `Taken ${stats.takenDays} of ${dashboard.scheduledDays} scheduled days`,
+      copy.takenOfScheduled(stats.takenDays, dashboard.scheduledDays),
       "stat-detail",
     );
   adherenceCard.setAttribute(
     "aria-label",
-    `Adherence ${stats.adherencePercent} percent. Taken ${stats.takenDays} of ${dashboard.scheduledDays} scheduled days.`,
+    copy.adherenceLabel(
+      stats.adherencePercent,
+      stats.takenDays,
+      dashboard.scheduledDays,
+    ),
   );
   adherenceCard.append(
-    el("span", "Adherence"),
+    el("span", t("Adherence")),
     adherenceValue,
     adherenceDetail,
   );
   if (dashboard.change !== null && dashboard.change !== 0) {
-    const direction = dashboard.change > 0 ? "▲" : "▼",
-      sign = dashboard.change > 0 ? "+" : "";
     adherenceCard.append(
-      el(
-        "span",
-        `${direction} ${sign}${dashboard.change}% vs previous period`,
-        "stat-change",
-      ),
+      el("span", copy.comparison(dashboard.change), "stat-change"),
     );
   }
   grid.append(adherenceCard);
@@ -473,25 +549,31 @@ function renderStats(data: StatsResponse) {
   ] as const) {
     const box = el("article", undefined, "stat"),
       value = stats[key];
-    box.setAttribute("aria-label", `${label}: ${value}`);
-    box.append(el("span", label), el("strong", String(value)));
+    box.setAttribute("aria-label", `${t(label)}: ${formatNumber(value)}`);
+    box.append(el("span", t(label)), el("strong", formatNumber(value)));
     grid.append(box);
   }
   const consistency = $("consistency-summary");
   consistency.replaceChildren();
   if (!stats.currentStreak) {
-    consistency.append(el("p", "Start your first streak today."));
+    consistency.append(el("p", t("Start your first streak today.")));
   } else {
     const milestone = nextStreakMilestone(stats.currentStreak);
     for (const [label, value] of [
-      ["Current streak", `${stats.currentStreak} medication days`],
-      ["Longest streak", `${stats.longestStreak} medication days`],
+      ["Current streak", copy.medicationDays(stats.currentStreak)],
+      ["Longest streak", copy.medicationDays(stats.longestStreak)],
       [
         "Next milestone",
-        milestone ? `${milestone} medication days` : "Keep going",
+        milestone ? copy.medicationDays(milestone) : t("Keep going"),
       ],
     ]) {
-      consistency.append(el("span", label), el("strong", value));
+      consistency.append(
+        el(
+          "span",
+          t(label as "Current streak" | "Longest streak" | "Next milestone"),
+        ),
+        el("strong", value),
+      );
     }
   }
   const timeline = $("stats-timeline");
@@ -505,13 +587,13 @@ function renderStats(data: StatsResponse) {
         undefined,
         `timeline-day timeline-${day.status}`,
       ),
-      date = new Date(`${day.day}T12:00:00`).toLocaleDateString([], {
+      date = formatDate(new Date(`${day.day}T12:00:00`), {
         dateStyle: "full",
       }),
       status = fullHistoryStatus(day.status),
       completion = day.required
-        ? `${day.takenRequired} of ${day.required} required medications taken`
-        : "No medications scheduled";
+        ? copy.completionCount(day.takenRequired, day.required)
+        : copy.noScheduleCompletion();
     button.append(
       el("span", String(Number(day.day.slice(-2))), "timeline-date"),
       el(
@@ -522,14 +604,22 @@ function renderStats(data: StatsResponse) {
         "timeline-status",
       ),
     );
-    button.setAttribute("aria-label", `${date}. ${status}. ${completion}.`);
+    button.setAttribute(
+      "aria-label",
+      copy.timelineLabel(date, status, completion),
+    );
     button.title = `${date}: ${status}`;
     button.onclick = () => openHistoryFromStatistics(day.day);
     timeline.append(button);
   }
-  $("timeline-description").textContent =
-    `${stats.takenDays} taken, ${stats.missedDays} missed, ${stats.partialDays} partial, and ${timelineDays.filter((day) => day.status === "none").length} with no schedule.`;
+  $("timeline-description").textContent = copy.statusCounts(
+    stats.takenDays,
+    stats.missedDays,
+    stats.partialDays,
+    timelineDays.filter((day) => day.status === "none").length,
+  );
   $("stats-definition").textContent = data.definition;
+  translateDocument();
 }
 
 function openHistoryFromStatistics(day: string) {
@@ -544,12 +634,13 @@ async function loadStatistics() {
 }
 async function load() {
   if (!storedToken()) {
-    $("auth-state").textContent = "Token not saved";
+    $("auth-state").textContent = t("Token not saved");
     void notificationDiagnostics();
     return;
   }
   try {
     app = await api<AppData>("/api/status");
+    await syncLanguage();
     let timeZoneNotice = "";
     const deviceTimeZone = detectedTimeZone(),
       updatedTimeZone = automaticTimeZoneUpdate(
@@ -565,26 +656,26 @@ async function load() {
           settingsPayload(app.settings, { timezone: updatedTimeZone }),
         ),
       });
-      timeZoneNotice = `Time zone updated to ${updatedTimeZone}.`;
+      timeZoneNotice = copy.timeZoneUpdated(updatedTimeZone);
     }
     statisticsData = null;
     renderToday();
     renderSettings();
-    $("connection").textContent = "Online";
+    $("connection").textContent = t("Online");
     note(timeZoneNotice);
     localStorage.setItem("pourmed-last-status", JSON.stringify(app));
   } catch (e) {
     $("connection").textContent = navigator.onLine
-      ? "Server unavailable"
-      : "Offline";
+      ? t("Server unavailable")
+      : t("Offline");
     $("auth-state").textContent =
       e instanceof ApiError && e.status === 401
-        ? "Token rejected"
-        : "Unavailable";
+        ? t("Token rejected")
+        : t("Unavailable");
     $("local-token-length").textContent = String(storedToken().length);
     if (e instanceof ApiError && e.expectedTokenLength !== null)
       $("server-token-length").textContent = String(e.expectedTokenLength);
-    note((e as Error).message);
+    note(errorMessage(e));
   }
 }
 async function setTaken(take: boolean, medicationId?: string, day?: string) {
@@ -597,13 +688,13 @@ async function setTaken(take: boolean, medicationId?: string, day?: string) {
     });
     note(
       take
-        ? "Saved as taken."
-        : "Correction saved. Future reminders may resume.",
+        ? t("Saved as taken.")
+        : t("Correction saved. Future reminders may resume."),
     );
     await load();
     if (day) await loadHistory();
   } catch (e) {
-    note((e as Error).message);
+    note(errorMessage(e));
   } finally {
     buttons.forEach((b) => (b.disabled = false));
   }
@@ -628,7 +719,7 @@ function renderSelectedDay(d: Day | undefined, medicationFilter: string) {
   content.replaceChildren();
   if (!d) {
     $("selected-day-title").textContent = selectedDay
-      ? new Date(`${selectedDay}T12:00:00`).toLocaleDateString([], {
+      ? formatDate(new Date(`${selectedDay}T12:00:00`), {
           dateStyle: "full",
         })
       : "No matching medication day";
@@ -638,7 +729,7 @@ function renderSelectedDay(d: Day | undefined, medicationFilter: string) {
     saveNote.disabled = true;
     return;
   }
-  const fullDate = new Date(`${d.day}T12:00:00`).toLocaleDateString([], {
+  const fullDate = formatDate(new Date(`${d.day}T12:00:00`), {
     dateStyle: "full",
   });
   $("selected-day-title").textContent = fullDate;
@@ -649,16 +740,25 @@ function renderSelectedDay(d: Day | undefined, medicationFilter: string) {
     [
       "Taken at",
       d.takenAt
-        ? new Date(d.takenAt).toLocaleString([], {
+        ? formatDate(new Date(d.takenAt), {
             dateStyle: "medium",
             timeStyle: "short",
             timeZone: app?.settings.timezone,
           })
         : "Not recorded",
     ],
-    ["Missed", d.status === "missed" ? "Yes" : "No"],
-    ["Reminder window", app?.settings.preview ?? "Unavailable"],
-    ["Corrected", d.corrected ? "Yes" : "No"],
+    [copy.missedQuestion(), d.status === "missed" ? "Yes" : "No"],
+    [
+      "Reminder window",
+      app
+        ? copy.schedulePreview(
+            formatClockMinute(app.settings.startMinute),
+            formatClockMinute(app.settings.endMinute),
+            app.settings.intervalMinute,
+          )
+        : t("Unavailable"),
+    ],
+    [copy.correctedQuestion(), d.corrected ? "Yes" : "No"],
   ]) {
     details.append(el("dt", label), el("dd", value));
   }
@@ -671,11 +771,15 @@ function renderSelectedDay(d: Day | undefined, medicationFilter: string) {
     const row = el("div", undefined, "med-row"),
       label = el(
         "p",
-        `${dose.name}${dose.dosage ? ` — ${dose.dosage}` : ""}: ${dose.taken ? "Taken" : "Not taken"}`,
+        copy.medicationStatusLabel(
+          dose.name,
+          dose.dosage,
+          t(dose.taken ? "Taken" : "Not taken"),
+        ),
       ),
       button = el("button", dose.taken ? "Mark Not Taken" : "Mark Taken");
     button.onclick = () => {
-      if (confirm(`Correct ${dose.name} for ${d.day}?`))
+      if (confirm(copy.correctionPrompt(dose.name, d.day)))
         void setTaken(!dose.taken, dose.id, d.day);
     };
     row.append(label, button);
@@ -686,13 +790,14 @@ function renderSelectedDay(d: Day | undefined, medicationFilter: string) {
     d.taken ? "Mark All Not Taken" : "Mark All Taken",
   );
   groupCorrection.onclick = () => {
-    if (confirm(`Correct all medications for ${d.day}?`))
+    if (confirm(copy.groupCorrectionPrompt(d.day)))
       void setTaken(!d.taken, undefined, d.day);
   };
   content.append(groupCorrection);
   noteInput.value = d.note;
   noteInput.disabled = false;
   saveNote.disabled = false;
+  translateDocument();
 }
 function openMedication(m?: Medication) {
   $<HTMLInputElement>("med-id").value = m?.id ?? "";
@@ -716,11 +821,7 @@ async function reorder(index: number, delta: number) {
   await load();
 }
 async function deleteMedication(m: Medication) {
-  if (
-    confirm(
-      `Permanently delete ${m.name}? Historical snapshots will be retained.`,
-    )
-  ) {
+  if (confirm(copy.deleteMedicationPrompt(m.name))) {
     await api(`/api/medications/${m.id}`, { method: "DELETE" });
     await load();
   }
@@ -771,13 +872,14 @@ document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach(
       b.setAttribute("aria-current", "page");
       if (b.dataset.view === "history") void loadHistory();
       if (b.dataset.view === "stats")
-        void loadStatistics().catch((error) => note(error.message));
+        void loadStatistics().catch((error) => note(errorMessage(error)));
     }),
 );
 $<HTMLButtonElement>("taken").onclick = () => void setTaken(true);
 $<HTMLButtonElement>("mark-all").onclick = () => void setTaken(true);
 $<HTMLButtonElement>("undo").onclick = () => {
-  if (confirm("Mark this medication day as not taken?")) void setTaken(false);
+  if (confirm(t("Mark this medication day as not taken?")))
+    void setTaken(false);
 };
 document.querySelectorAll<HTMLButtonElement>("[data-snooze]").forEach(
   (b) =>
@@ -795,7 +897,7 @@ $<HTMLFormElement>("schedule-form").onsubmit = (e) => {
       ? detectedTimeZone()
       : $<HTMLInputElement>("timezone").value.trim();
   if (!validTimeZone(timezone)) {
-    note("Choose a valid IANA time zone.");
+    note(t("Choose a valid IANA time zone."));
     return;
   }
   void mutate("/api/settings", "PUT", {
@@ -812,14 +914,25 @@ $<HTMLFormElement>("schedule-form").onsubmit = (e) => {
     previewText: $<HTMLInputElement>("preview-text").value,
   })
     .then(() => {
-      note("Settings saved.");
+      note(t("Settings saved."));
       return load();
     })
-    .catch((e) => note(e.message));
+    .catch((e) => note(errorMessage(e)));
 };
 $<HTMLInputElement>("timezone-automatic").onchange = renderTimeZoneControls;
 $<HTMLInputElement>("timezone-manual").onchange = renderTimeZoneControls;
 $<HTMLInputElement>("timezone").oninput = renderTimeZoneControls;
+$<HTMLSelectElement>("language").onchange = () => {
+  const next = $<HTMLSelectElement>("language").value as Locale;
+  setLocale(next);
+  if (app) {
+    renderToday();
+    renderSettings();
+    if (historyDays.length) renderHistory();
+    if (statisticsData) renderStats(statisticsData);
+  }
+  if (storedToken()) void syncLanguage();
+};
 const timeZones = (
   Intl as typeof Intl & { supportedValuesOf?: (key: "timeZone") => string[] }
 ).supportedValuesOf?.("timeZone") ?? [
@@ -855,14 +968,14 @@ $<HTMLFormElement>("med-form").onsubmit = (e) => {
       $<HTMLDialogElement>("med-dialog").close();
       return load();
     })
-    .catch((e) => note(e.message));
+    .catch((e) => note(errorMessage(e)));
 };
 $<HTMLButtonElement>("save-day-note").onclick = () =>
   void mutate("/api/day-note", "PUT", {
     day: selectedDay,
     note: $<HTMLTextAreaElement>("day-note").value,
   }).then(() => {
-    note("Day note saved.");
+    note(t("Day note saved."));
     return loadHistory();
   });
 $<HTMLSelectElement>("history-filter").onchange = renderHistory;
@@ -876,7 +989,7 @@ document
     (b) =>
       (b.onclick = () =>
         void download(b.dataset.export as "json" | "csv").catch((e) =>
-          note(e.message),
+          note(errorMessage(e)),
         )),
   );
 $<HTMLButtonElement>("save-token").onclick = () => {
@@ -889,10 +1002,10 @@ $<HTMLButtonElement>("save-token").onclick = () => {
     if (localStorage.getItem("pourmed-token") !== v)
       throw new Error("Token could not be read back from device storage.");
     token.value = v;
-    note("Access saved and read back. Checking server…");
+    note(t("Access saved and read back. Checking server…"));
     void load();
   } catch (error) {
-    note((error as Error).message || "Device storage is unavailable.");
+    note(errorMessage(error));
   }
 };
 $<HTMLButtonElement>("forget-token").onclick = () => {
@@ -901,23 +1014,23 @@ $<HTMLButtonElement>("forget-token").onclick = () => {
   location.reload();
 };
 $<HTMLButtonElement>("enable").onclick = () =>
-  void subscribe().catch((e) => note(e.message));
+  void subscribe().catch((e) => note(errorMessage(e)));
 $<HTMLButtonElement>("refresh").onclick = () =>
-  void subscribe().catch((e) => note(e.message));
+  void subscribe().catch((e) => note(errorMessage(e)));
 $<HTMLButtonElement>("test").onclick = () =>
   void mutate("/api/push/test")
-    .then(() => note("Test notification sent."))
-    .catch((e) => note(e.message));
+    .then(() => note(t("Test notification sent.")))
+    .catch((e) => note(errorMessage(e)));
 $<HTMLButtonElement>("test-delayed").onclick = () =>
   void mutate("/api/push/test-delayed")
-    .then(() => note("Delayed test scheduled. Lock the iPhone now."))
-    .catch((e) => note(e.message));
+    .then(() => note(t("Delayed test scheduled. Lock the iPhone now.")))
+    .catch((e) => note(errorMessage(e)));
 $<HTMLButtonElement>("remove-device").onclick = () =>
   void api("/api/push/subscribe", { method: "DELETE" }).then(load);
 window.addEventListener("online", () => void load());
 window.addEventListener("offline", () => {
-  $("connection").textContent = "Offline";
-  note("Offline — changes cannot be saved until reconnected.");
+  $("connection").textContent = t("Offline");
+  note(t("Offline — changes cannot be saved until reconnected."));
 });
 void notificationDiagnostics();
 if ("serviceWorker" in navigator)
@@ -930,7 +1043,7 @@ if ("serviceWorker" in navigator)
         hideUpdate = () => {
           banner.hidden = true;
           button.disabled = true;
-          status.textContent = "Up to date.";
+          status.textContent = t("Up to date.");
         },
         showWaiting = () => {
           if (!reg.waiting) {
@@ -938,7 +1051,7 @@ if ("serviceWorker" in navigator)
             return;
           }
           banner.hidden = false;
-          status.textContent = "An update is available.";
+          status.textContent = t("An update is available.");
           button.disabled = false;
         };
       showWaiting();
@@ -956,12 +1069,12 @@ if ("serviceWorker" in navigator)
             .update()
             .then(showWaiting)
             .catch((error) => {
-              status.textContent = `Update check failed: ${(error as Error).message}`;
+              status.textContent = errorMessage(error);
               button.disabled = false;
             });
           return;
         }
-        status.textContent = "Applying update…";
+        status.textContent = t("Applying update…");
         button.disabled = true;
         waiting.addEventListener("statechange", () => {
           if (waiting.state === "activated" || waiting.state === "redundant")
@@ -987,8 +1100,8 @@ if ("serviceWorker" in navigator)
       return notificationDiagnostics();
     })
     .catch((error) => {
-      $("sw-version").textContent = "Registration failed";
-      $("subscription-state").textContent = "Unavailable";
-      note(`Service worker failed: ${(error as Error).message}`);
+      $("sw-version").textContent = t("Registration failed");
+      $("subscription-state").textContent = t("Unavailable");
+      note(errorMessage(error));
     });
 void load();

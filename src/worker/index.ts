@@ -18,6 +18,7 @@ import {
   type ScheduleSettings,
   type TimeZoneMode,
 } from "../shared/domain";
+import { notificationCopy } from "../shared/localization";
 import type { Env } from "./types";
 import { healthPayload } from "../shared/version";
 
@@ -379,6 +380,25 @@ export class MedicationState extends DurableObject<Env> {
   }
   private async push(test = false) {
     const preferences = this.settings();
+    const language =
+        [
+          ...this.ctx.storage.sql.exec<{ value: string }>(
+            "SELECT value FROM config WHERE key='language'",
+          ),
+        ][0]?.value === "zh-CN"
+          ? "zh-CN"
+          : "en",
+      enabledMedications = this.medications().filter(
+        (medication) => medication.enabled,
+      ),
+      notification = notificationCopy(
+        language,
+        test,
+        preferences.previewText,
+        enabledMedications.length === 1
+          ? enabledMedications[0]!.name
+          : undefined,
+      );
     const raw = [
       ...this.ctx.storage.sql.exec<{ value: string }>(
         "SELECT value FROM config WHERE key='subscription'",
@@ -390,10 +410,7 @@ export class MedicationState extends DurableObject<Env> {
       const payload = await buildPushPayload(
         {
           data: JSON.stringify({
-            title: "PourMed",
-            body: test
-              ? "Your test notification is working."
-              : preferences.previewText || "It’s time to take your medication.",
+            ...notification,
             url: "/",
             quiet: preferences.quietPreference,
             badge: preferences.badgePreference,
@@ -531,7 +548,9 @@ export class MedicationState extends DurableObject<Env> {
       nextReminder: state.taken
         ? null
         : (a.snoozeUntil ?? (next === null ? null : formatMinute(next))),
+      nextReminderMinute: state.taken || a.snoozeUntil ? null : next,
       reminderEnd: formatMinute(a.settings.endMinute),
+      reminderEndMinute: a.settings.endMinute,
       snoozeUntil: a.snoozeUntil,
       subscriptionActive: subscription,
       vapidPublicKey: this.env.VAPID_PUBLIC_KEY,
@@ -540,7 +559,7 @@ export class MedicationState extends DurableObject<Env> {
         expectedTokenLength: Number(this.env.ACCESS_TOKEN_LENGTH) || null,
         lastSuccessfulPush: lastPush,
         lastPushError: lastError,
-        serviceWorkerVersion: "v9",
+        serviceWorkerVersion: "v10",
       },
       activeMedicationCount: active.length,
     };
@@ -590,6 +609,16 @@ export class MedicationState extends DurableObject<Env> {
       }
       if (url.pathname === "/api/status" && req.method === "GET")
         return ok(this.bootstrap(now));
+      if (url.pathname === "/api/language" && req.method === "PUT") {
+        const language = String(record(await readJson(req)).language);
+        if (language !== "en" && language !== "zh-CN")
+          throw new ApiError(400, "INVALID_LANGUAGE", "Language is invalid.");
+        this.ctx.storage.sql.exec(
+          "INSERT INTO config(key,value) VALUES('language',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+          language,
+        );
+        return ok({ language });
+      }
       if (url.pathname === "/api/settings" && req.method === "PUT") {
         this.mutationLimit();
         const x = record(await readJson(req));

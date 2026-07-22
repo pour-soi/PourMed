@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="icon" href="/icons/icon.svg" />
     <link rel="stylesheet" href="/style.css" />
-    <title>PourMed</title>
+    <title>PourMed — Medication reminder</title>
   </head>
   <body>
     <header class="app-header">
@@ -88,6 +88,7 @@
           id="calendar"
           class="calendar"
           aria-label="Monthly medication history"
+          data-i18n-aria-label="Monthly medication history"
         ></div>
         <article id="selected-day" class="card" aria-live="polite">
           <h3 id="selected-day-title">Select a medication day</h3>
@@ -132,6 +133,15 @@
       <section id="settings-view" class="view" aria-labelledby="settings-title">
         <h2 id="settings-title">Settings</h2>
         <form id="schedule-form" class="settings-groups">
+          <section class="card form-grid" aria-labelledby="language-heading">
+            <h3 id="language-heading">Language</h3>
+            <label
+              >Language<select id="language">
+                <option value="en">English</option>
+                <option value="zh-CN">简体中文</option>
+              </select></label
+            >
+          </section>
           <section class="card form-grid" aria-labelledby="schedule-heading">
             <h3 id="schedule-heading">Reminder schedule</h3>
             <label
@@ -285,6 +295,7 @@
               class="dialog-close"
               id="close-med"
               aria-label="Close medication editor"
+              data-i18n-aria-label="Close medication editor"
             >
               ×
             </button>
@@ -332,7 +343,7 @@
         </details>
       </section>
     </main>
-    <nav class="bottom-nav" aria-label="Primary">
+    <nav class="bottom-nav" aria-label="Primary" data-i18n-aria-label="Primary">
       <button data-view="today" aria-current="page">Today</button
       ><button data-view="history">History</button
       ><button data-view="stats">Statistics</button

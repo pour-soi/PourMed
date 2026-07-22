@@ -1,20 +1,22 @@
+import { t } from "./i18n";
+
 export type HistoryDose = { id: string; taken: boolean };
 export type HistoryDay = { day: string; status: string; doses: HistoryDose[] };
 
 export function shortHistoryStatus(status: string) {
-  if (status === "taken") return "Taken";
-  if (status === "missed") return "Missed";
+  if (status === "taken") return t("Taken");
+  if (status === "missed") return t("Missed");
   if (status === "none") return "—";
-  return "Pending";
+  return t("Pending");
 }
 
 export function fullHistoryStatus(status: string) {
-  if (status === "taken") return "Taken";
-  if (status === "partial") return "Partially taken";
-  if (status === "missed") return "Missed";
-  if (status === "none") return "No schedule";
-  if (status === "future") return "Pending";
-  return "Not taken yet";
+  if (status === "taken") return t("Taken");
+  if (status === "partial") return t("Partially taken");
+  if (status === "missed") return t("Missed");
+  if (status === "none") return t("No schedule");
+  if (status === "future") return t("Pending");
+  return t("Not taken yet");
 }
 
 export function filterHistoryDays<T extends HistoryDay>(
@@ -53,21 +55,21 @@ export function todaySummary(input: {
 }) {
   const status =
     input.status === "taken"
-      ? "Taken tonight"
+      ? t("Taken tonight")
       : input.status === "missed"
-        ? "Missed"
+        ? t("Missed")
         : input.status === "none"
-          ? "No schedule"
-          : "Not taken yet";
+          ? t("No schedule")
+          : t("Not taken yet");
   const reminder = !input.remindersEnabled
-    ? "Reminders are disabled."
+    ? t("Reminders are disabled.")
     : input.status === "none"
-      ? "No schedule."
+      ? t("No schedule.")
       : input.status === "taken"
-        ? "Later reminders are stopped for this medication day."
+        ? t("Later reminders are stopped for this medication day.")
         : input.nextReminder
           ? input.nextReminder
-          : "No reminders remain in the current medication window.";
+          : t("No reminders remain in the current medication window.");
   return { status, reminder };
 }
 

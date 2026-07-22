@@ -1,4 +1,4 @@
-const CACHE = "pourmed-shell-v9",
+const CACHE = "pourmed-shell-v10",
   SHELL = [
     "/",
     "/manifest.webmanifest",
@@ -25,7 +25,7 @@ self.addEventListener("activate", (e) =>
       .then((windows) =>
         Promise.all(
           windows.map((client) => {
-            client.postMessage({ type: "POURMED_ACTIVATED", version: "v9" });
+            client.postMessage({ type: "POURMED_ACTIVATED", version: "v10" });
             return client.navigate ? client.navigate(client.url) : undefined;
           }),
         ),

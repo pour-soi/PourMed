@@ -6,12 +6,16 @@ import sharp from "sharp";
 
 const root = new URL("../../", import.meta.url).pathname;
 const output = new URL("../../docs/images/", import.meta.url).pathname;
+const chineseOutput = `${output}zh/`;
 const origin = "http://127.0.0.1:4173";
 const today = "2026-07-21";
 const medicationId = "00000000-0000-4000-8000-000000000001";
 const sessionToken = randomBytes(24).toString("base64url");
 let completed = false;
 let theme = "light";
+let fixtureLanguage = "en";
+const medicationName = () =>
+  fixtureLanguage === "zh-CN" ? "晚间用药" : "Evening Medication";
 
 const shiftDay = (day, offset) => {
   const value = new Date(`${day}T00:00:00Z`);
@@ -43,7 +47,7 @@ const historyDay = (day) => {
     doses: [
       {
         id: medicationId,
-        name: "Evening Medication",
+        name: medicationName(),
         dosage: null,
         required: true,
         taken,
@@ -52,9 +56,10 @@ const historyDay = (day) => {
     ],
   };
 };
-const monthDays = Array.from({ length: 31 }, (_, index) =>
-  historyDay(`2026-07-${String(index + 1).padStart(2, "0")}`),
-);
+const monthDays = () =>
+  Array.from({ length: 31 }, (_, index) =>
+    historyDay(`2026-07-${String(index + 1).padStart(2, "0")}`),
+  );
 const statisticDays = Array.from({ length: 30 }, (_, index) => {
   const day = shiftDay("2026-06-22", index);
   const taken = !missed.has(day);
@@ -102,7 +107,7 @@ const currentDay = () => ({
   doses: [
     {
       id: medicationId,
-      name: "Evening Medication",
+      name: medicationName(),
       dosage: null,
       required: true,
       taken: completed,
@@ -119,7 +124,7 @@ const statusPayload = () => ({
   medications: [
     {
       id: medicationId,
-      name: "Evening Medication",
+      name: medicationName(),
       dosage: null,
       instructions: null,
       enabled: 1,
@@ -129,7 +134,9 @@ const statusPayload = () => ({
     },
   ],
   nextReminder: completed ? null : "10:30 PM",
+  nextReminderMinute: completed ? null : 1350,
   reminderEnd: "4:00 AM",
+  reminderEndMinute: 240,
   snoozeUntil: null,
   subscriptionActive: true,
   vapidPublicKey: "",
@@ -138,7 +145,7 @@ const statusPayload = () => ({
     expectedTokenLength: null,
     lastSuccessfulPush: null,
     lastPushError: null,
-    serviceWorkerVersion: "v9",
+    serviceWorkerVersion: "v10",
   },
   activeMedicationCount: 1,
 });
@@ -192,7 +199,7 @@ async function capture(page, filename, { fullPage = true } = {}) {
   return path;
 }
 
-async function createHero() {
+async function createHero(prefix = "") {
   const sources = [
     "home-pending-light.png",
     "statistics-light.png",
@@ -203,7 +210,7 @@ async function createHero() {
       const mask = Buffer.from(
         '<svg width="330" height="714"><rect width="330" height="714" rx="28" fill="white"/></svg>',
       );
-      return sharp(`${output}${name}`)
+      return sharp(`${output}${prefix}${name}`)
         .resize(330, 714, { fit: "cover", position: "top" })
         .composite([{ input: mask, blend: "dest-in" }])
         .png({ compressionLevel: 9 })
@@ -235,10 +242,11 @@ async function createHero() {
       })),
     )
     .png({ compressionLevel: 9, adaptiveFiltering: true })
-    .toFile(`${output}pourmed-hero.png`);
+    .toFile(`${output}${prefix}pourmed-hero.png`);
 }
 
 await mkdir(output, { recursive: true });
+await mkdir(chineseOutput, { recursive: true });
 const server = spawn(
   "pnpm",
   ["exec", "vite", "--host", "127.0.0.1", "--port", "4173", "--strictPort"],
@@ -301,7 +309,7 @@ try {
       if (url.pathname === "/api/status")
         return route.fulfill(json({ ok: true, data: statusPayload() }));
       if (url.pathname === "/api/history")
-        return route.fulfill(json({ ok: true, data: { days: monthDays } }));
+        return route.fulfill(json({ ok: true, data: { days: monthDays() } }));
       if (url.pathname === "/api/statistics")
         return route.fulfill(
           json({
@@ -381,11 +389,94 @@ try {
     });
     await capture(page, "home-pending-dark.png");
 
+    completed = false;
+    theme = "light";
+    fixtureLanguage = "zh-CN";
+    await page.reload({ waitUntil: "networkidle" });
+    await page.locator('[data-view="settings"]').click();
+    await page.locator("#language").selectOption("zh-CN");
+    await page.getByRole("heading", { name: "设置" }).waitFor();
+    await page.evaluate(() => {
+      document
+        .querySelectorAll(
+          "#schedule-form > :not(section[aria-labelledby='language-heading']), #settings-view > section, #settings-view > details, #settings-view > dialog",
+        )
+        .forEach((element) => {
+          if (element instanceof HTMLElement) element.style.display = "none";
+        });
+      window.scrollTo(0, 0);
+    });
+    await capture(page, "zh/settings-language-light.png", { fullPage: false });
+    await page.evaluate(() => {
+      document
+        .querySelectorAll("#settings-view [style*='display: none']")
+        .forEach((element) => {
+          if (element instanceof HTMLElement)
+            element.style.removeProperty("display");
+        });
+    });
+
+    await page.locator('[data-view="today"]').click();
+    await page.locator("#status").filter({ hasText: "还没吃" }).waitFor();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await capture(page, "zh/home-pending-light.png");
+
+    await page.locator("#taken").click();
+    await page.locator("#status").filter({ hasText: "今晚已完成" }).waitFor();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await capture(page, "zh/home-completed-light.png");
+
+    await page.locator('[data-view="history"]').click();
+    await page.getByRole("heading", { name: "记录" }).waitFor();
+    await page.locator('#calendar button[aria-label*="2026年7月12日"]').click();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await capture(page, "zh/history-light.png");
+
+    await page.locator('[data-view="stats"]').click();
+    await page.getByRole("heading", { name: "统计" }).waitFor();
+    await page.locator("#stats-period").selectOption("previous-30");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await capture(page, "zh/statistics-light.png");
+
+    await page.locator('[data-view="settings"]').click();
+    await page
+      .locator('section[aria-labelledby="timezone-heading"]')
+      .evaluate((section) => section.scrollIntoView({ block: "start" }));
+    await capture(page, "zh/settings-time-zone-light.png", { fullPage: false });
+
+    await page.locator("#advanced-settings summary").click();
+    await page
+      .locator("#advanced-settings")
+      .evaluate((details) => details.scrollIntoView({ block: "start" }));
+    await capture(page, "zh/notifications-status-light.png", {
+      fullPage: false,
+    });
+
+    completed = false;
+    theme = "dark";
+    await page.reload({ waitUntil: "networkidle" });
+    await page.locator("#status").filter({ hasText: "还没吃" }).waitFor();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await capture(page, "zh/home-pending-dark.png");
+
+    for (const width of [360, 1024]) {
+      await page.setViewportSize({ width, height: width === 360 ? 780 : 900 });
+      const overflow = await page.evaluate(
+        () =>
+          Math.max(
+            document.body.scrollWidth,
+            document.documentElement.scrollWidth,
+          ) > window.innerWidth,
+      );
+      if (overflow) throw new Error(`Chinese layout overflows at ${width}px.`);
+    }
+
     if (errors.length) throw new Error(`Browser errors: ${errors.join("; ")}`);
   } finally {
     await browser.close();
   }
   await createHero();
+  await createHero("zh/");
 } finally {
   server.kill("SIGTERM");
 }
@@ -399,6 +490,15 @@ for (const name of [
   "settings-time-zone-light.png",
   "notifications-status-light.png",
   "home-pending-dark.png",
+  "zh/pourmed-hero.png",
+  "zh/home-pending-light.png",
+  "zh/home-completed-light.png",
+  "zh/history-light.png",
+  "zh/statistics-light.png",
+  "zh/settings-language-light.png",
+  "zh/settings-time-zone-light.png",
+  "zh/notifications-status-light.png",
+  "zh/home-pending-dark.png",
 ]) {
   const metadata = await sharp(`${output}${name}`).metadata();
   console.log(`${name}: ${metadata.width}x${metadata.height}`);

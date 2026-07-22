@@ -1,5 +1,9 @@
 # Durable Object migrations
 
+## v1.2 language preference
+
+No database migration is required for v1.2. The device preference is stored locally for immediate startup, while the current notification language uses the existing Durable Object `config` key-value table. Medication history, settings rows, reminder slots, time-zone data, statistics, credentials, and the existing Web Push subscription are not rewritten.
+
 ## v3 time-zone mode
 
 The v3 migration adds one non-null `time_zone_mode` column to `settings`, defaulting existing installations to `automatic`. It is additive and idempotent. Existing IANA time zones, medication-day keys, history, reminder slots, subscriptions, and credentials are retained unchanged; there is no historical data conversion.

@@ -1,6 +1,6 @@
 # Screenshot safety and regeneration record
 
-The README screenshots are generated from the real PourMed v1.1.0 client rendered by Vite in an isolated Playwright browser. The workflow intercepts only that local page's API calls with deterministic in-memory fixtures. It never starts Wrangler, connects to Cloudflare, opens a production URL, reads a browser profile, or creates a Durable Object.
+The English and Simplified Chinese README screenshots are generated from the real PourMed v1.2.0 client rendered by Vite in an isolated Playwright browser. The workflow intercepts only that local page's API calls with deterministic in-memory fixtures. It never starts Wrangler, connects to Cloudflare, opens a production URL, reads a browser profile, or creates a Durable Object.
 
 ## Deterministic fixture
 
@@ -25,8 +25,10 @@ The local fixture uses a disposable synthetic token only inside the temporary br
 - `history-light.png` — July medication-day history, including an early-morning completion assigned to the prior day
 - `statistics-light.png` — calculated 30-day adherence, streaks, counts, and timeline
 - `settings-time-zone-light.png` — Automatic device time zone with Manual mode available
-- `notifications-status-light.png` — safe healthy diagnostics with Service Worker v9
+- `notifications-status-light.png` — safe healthy diagnostics with Service Worker v10
 - `home-pending-dark.png` — optional Dark Mode Home state
+
+The `zh/` directory contains the equivalent Simplified Chinese set plus `settings-language-light.png`. English screenshots are retained unchanged in location and are regenerated alongside the Chinese set.
 
 ## Regenerate
 

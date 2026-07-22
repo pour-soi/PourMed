@@ -9,6 +9,7 @@ describe("manifest", () => {
       start_url: "/",
       scope: "/",
       display: "standalone",
+      lang: "en",
     });
     expect(
       m.icons.some((i: { purpose?: string }) => i.purpose === "maskable"),

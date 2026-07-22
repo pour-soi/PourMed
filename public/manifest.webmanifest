@@ -1,7 +1,8 @@
 {
   "name": "PourMed",
   "short_name": "PourMed",
-  "description": "Privacy-first medication reminder PWA",
+  "description": "A simple, private medication reminder.",
+  "lang": "en",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

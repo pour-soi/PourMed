@@ -4,6 +4,22 @@ All notable changes to PourMed are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-22
+
+### Added
+
+- Complete English and Simplified Chinese interfaces in one PWA, with an accessible language control under Settings.
+- First-use language detection for `zh`, `zh-CN`, and `zh-SG`, plus a persistent manual preference and English fallback.
+- Locale-aware dates, times, numbers, accessibility labels, errors, and Web Push notification copy.
+- A Simplified Chinese README and deterministic Chinese screenshot set.
+
+### Changed
+
+- The Service Worker advances to v10 so installed PWAs receive the localized frontend.
+- Notification language is recorded in the existing Durable Object configuration store without changing the schema or push subscription.
+
+Existing medication history, schedules, time-zone settings, adherence records, and push subscriptions are not rewritten.
+
 ## [1.1.0] - 2026-07-22
 
 ### Added
@@ -40,3 +56,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 [1.0.0]: https://github.com/pour-soi/PourMed/releases/tag/v1.0.0
 [1.1.0]: https://github.com/pour-soi/PourMed/releases/tag/v1.1.0
+[1.2.0]: https://github.com/pour-soi/PourMed/releases/tag/v1.2.0
