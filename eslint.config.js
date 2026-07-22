@@ -19,4 +19,8 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser, ...globals.worker } },
   },
   { files: ["scripts/*.mjs"], languageOptions: { globals: globals.node } },
+  {
+    files: ["scripts/screenshots/*.mjs"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
 );

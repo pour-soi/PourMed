@@ -1,32 +1,22 @@
 # PourMed
 
-A privacy-first, self-hosted medication reminder PWA built on Cloudflare.
-
-PourMed is a single-user application that you deploy to your own Cloudflare account. Medication records stay in that deployment: the maintainer does not provide a shared hosted service, and this public repository contains no production credentials or personal medication data.
-
 [![GitHub release](https://img.shields.io/github/v/release/pour-soi/PourMed?display_name=tag)](https://github.com/pour-soi/PourMed/releases)
 [![CI](https://github.com/pour-soi/PourMed/actions/workflows/ci.yml/badge.svg)](https://github.com/pour-soi/PourMed/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/github/license/pour-soi/PourMed)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)
 ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)
 
-## Screenshots
+A privacy-first, self-hosted medication reminder PWA built on Cloudflare.
 
-All screenshots come from an isolated local PourMed instance with synthetic medications, history, credentials, and push-subscription data. No production deployment or personal data was used.
+<p align="center">
+  <img
+    src="docs/images/pourmed-hero.png"
+    alt="PourMed showing the medication reminder home screen, adherence statistics, and time-zone settings"
+    width="100%"
+  />
+</p>
 
-| Ready for the evening routine                                                                               | Medication day completed                                                                               |
-| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| ![PourMed Home showing two synthetic medications not yet taken and the next reminder](docs/images/home.png) | ![PourMed Home showing the synthetic medications completed for the evening](docs/images/completed.png) |
-
-| History                                                                                                      | Statistics                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| ![PourMed History showing synthetic completed, missed, and partial medication days](docs/images/history.png) | ![PourMed Statistics showing synthetic adherence, streaks, and completion timeline](docs/images/statistics.png) |
-
-### Notification diagnostics
-
-![PourMed technical diagnostics showing authenticated local demo status, synthetic push subscription state, and service worker version](docs/images/notifications-diagnostics.png)
-
-See the [screenshot safety record](docs/images/README.md) for the capture constraints.
+PourMed is a single-user application that you deploy to your own Cloudflare account. Medication records stay in that deployment: the maintainer does not provide a shared hosted service, and this public repository contains no production credentials or personal medication data.
 
 ## Features
 
@@ -41,6 +31,89 @@ See the [screenshot safety record](docs/images/README.md) for the capture constr
 - Current and longest streak tracking
 - Offline application shell
 - Self-hosted Cloudflare deployment
+
+## Medication reminders
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img
+        src="docs/images/home-pending-light.png"
+        alt="PourMed home screen before the fictional Evening Medication is marked taken"
+      />
+      <br />
+      <sub>Reminder pending</sub>
+    </td>
+    <td width="50%" align="center">
+      <img
+        src="docs/images/home-completed-light.png"
+        alt="PourMed home screen after the fictional Evening Medication is marked taken"
+      />
+      <br />
+      <sub>Medication completed</sub>
+    </td>
+  </tr>
+</table>
+
+## History and statistics
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img
+        src="docs/images/history-light.png"
+        alt="PourMed medication-day history with fictional completed and missed days"
+      />
+      <br />
+      <sub>Medication-day history</sub>
+    </td>
+    <td width="50%" align="center">
+      <img
+        src="docs/images/statistics-light.png"
+        alt="PourMed statistics showing 87 percent adherence, streaks, and a 30-day timeline from synthetic history"
+      />
+      <br />
+      <sub>Adherence and streaks</sub>
+    </td>
+  </tr>
+</table>
+
+## Time zone support
+
+Automatic mode follows the device's IANA time zone, with a validated manual override when reminders should remain tied to another location. Scheduling is DST-aware, the medication day resets at 7:00 AM, and overnight reminders remain assigned to the prior medication day. Changing time zones affects future reminders without rewriting existing history.
+
+<p align="center">
+  <img
+    src="docs/images/settings-time-zone-light.png"
+    alt="PourMed Settings showing Automatic device time-zone mode with America Los Angeles detected and Manual mode available"
+    width="390"
+  />
+</p>
+
+## Notification readiness and dark mode
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img
+        src="docs/images/notifications-status-light.png"
+        alt="PourMed diagnostics showing authenticated access, granted notification permission, an active synthetic subscription, and Service Worker v9"
+      />
+      <br />
+      <sub>Healthy notification status</sub>
+    </td>
+    <td width="50%" align="center">
+      <img
+        src="docs/images/home-pending-dark.png"
+        alt="PourMed reminder-pending home screen in dark mode using fictional medication data"
+      />
+      <br />
+      <sub>Dark mode</sub>
+    </td>
+  </tr>
+</table>
+
+All screenshots use deterministic synthetic data rendered by the real PourMed client. No production deployment, personal medication data, or private credential was used. See the [screenshot safety and regeneration record](docs/images/README.md).
 
 ## Important platform behavior
 
